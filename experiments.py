@@ -9,6 +9,17 @@ import matplotlib.pyplot as plt
 from glob import glob
 from os.path import join
 from os import mkdir
+from multiprocessing import Pool, cpu_count
+
+
+def mapper(f, pars, *argv, **kwarg):
+    # parallel process over shared object
+    pool = Pool(cpu_count() - 1)
+    res = pool.starmap_async(f, [(p, *argv, *list(kwarg.values())) for p in pars])
+    a = res.get()
+    pool.close()
+    pool.join()
+    return a
 
 
 def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize=(4.5, 3), basepath='results'):
@@ -39,12 +50,13 @@ def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize
 max_iterations = 200
 scens_min, scens_max = 10, 100
 steps_min, steps_max = 10, 100
+par_steps = 10
 
 
-models = {#'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
-          #'dt scenred': DiffTree(init='scenred', base_tree='scenred'),
-          #'ng quant': NeuralGas(init='quantiles', base_tree='quantiles'),
-          #'dt quant': DiffTree(init='quantiles', base_tree='quantiles'),
+models = {'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
+          'dt scenred': DiffTree(init='scenred', base_tree='scenred'),
+          'ng quant': NeuralGas(init='quantiles', base_tree='quantiles'),
+          'dt quant': DiffTree(init='quantiles', base_tree='quantiles'),
           'scenred': ScenredTree(),
           'qt': QuantileTree()}
 
@@ -52,12 +64,13 @@ models = {#'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
 processes = {'sin': sin_process,
              'random walk': random_walk}
 
-parameters = {'n_scens': np.linspace(scens_min, scens_max, 2, dtype=int),
-              'steps': np.linspace(steps_min, steps_max, 2, dtype=int)}
+parameters = {'n_scens': np.linspace(scens_min, scens_max, par_steps, dtype=int),
+              'steps': np.linspace(steps_min, steps_max, par_steps, dtype=int)}
 
 
-results = []
-for s in parameters['steps']:
+
+def parfun(s, parameters, processes, models, max_iterations=200):
+    results = []
     for n in parameters['n_scens']:
         for p_name, p in processes.items():
             test_scens = p(steps=s, n_scens=n)
@@ -68,7 +81,10 @@ for s in parameters['steps']:
                 results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
                                              'n_scens': n, 'steps': s, 'time': t_1 - t_0,
                                              'loss': float(m.losses[-1])}, index=[0]))
+    return results
 
+
+results = mapper(parfun, parameters['steps'], parameters, processes, models, max_iterations=max_iterations)
 results = pd.concat(results, axis=0)
 
 
