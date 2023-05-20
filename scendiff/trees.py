@@ -191,7 +191,7 @@ class NeuralGas(ScenarioTree):
             scen = jnp.ravel(scens[:, np.random.choice(scens.shape[1], 1)])
             # compute distances and ranks from tree scenarios
             dists = self.compute_distances(tree_scens, scen)
-            ranks = np.argsort(dists)
+            ranks = jnp.argsort(dists)
             # update pars
             e_k = self.pars['e0'] * (self.pars['ef'] / self.pars['e0']) ** (k / k_max)
             lambda_k = self.pars['lambda_0'] * (self.pars['lambda_f'] / self.pars['lambda_0']) ** (k / k_max)
