@@ -10,6 +10,8 @@ from glob import glob
 from os.path import join
 from os import mkdir
 from multiprocessing import Pool, cpu_count
+from itertools import product
+from functools import partial
 
 
 def mapper(f, pars, *argv, **kwarg):
@@ -62,32 +64,44 @@ models = {'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
 
 
 processes = {'sin': sin_process,
+             'double sin': partial(sin_process, double=True),
              'random walk': random_walk}
 
 parameters = {'n_scens': np.linspace(scens_min, scens_max, par_steps, dtype=int),
               'steps': np.linspace(steps_min, steps_max, par_steps, dtype=int)}
 
 
+pars = list(product(parameters['steps'], parameters['n_scens']))
 
-def parfun(s, parameters, processes, models, max_iterations=200):
+
+def parfun(pars, processes, models, max_iterations=200):
     results = []
-    for n in parameters['n_scens']:
-        for p_name, p in processes.items():
-            test_scens = p(steps=s, n_scens=n)
-            for m_name, m in models.items():
-                t_0 = time()
-                tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=False)
-                t_1 = time()
-                results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
-                                             'n_scens': n, 'steps': s, 'time': t_1 - t_0,
-                                             'loss': float(m.losses[-1])}, index=[0]))
+    s, n = pars
+    t_00 = time()
+    for p_name, p in processes.items():
+        test_scens = p(steps=s, n_scens=n)
+        for m_name, m in models.items():
+            t_0 = time()
+            tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=False)
+            t_1 = time()
+            results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
+                                         'n_scens': n, 'steps': s, 'time': t_1 - t_0,
+                                         'loss': float(m.losses[-1])}, index=[0]))
+    del test_scens
+    print('{},{}: {:0.1f} min'.format(s, n, (time() - t_00)/60))
     return results
 
 
-results = mapper(parfun, parameters['steps'], parameters, processes, models, max_iterations=max_iterations)
+results = mapper(parfun, pars, processes, models, max_iterations=max_iterations)
+results = [item for sublist in results for item in sublist]
+
+"""
+results = []
+for p in pars:
+    results.append(parfun(p, processes, models, max_iterations=max_iterations))
+"""
+
 results = pd.concat(results, axis=0)
-
-
 
 plot_results(results, 'n_scens', 'loss', 'model', subplot_effect='process')
 plot_results(results, 'steps', 'loss', 'model', subplot_effect='process')

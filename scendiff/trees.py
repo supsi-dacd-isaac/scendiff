@@ -177,7 +177,7 @@ class NeuralGas(ScenarioTree):
                 tree_vals = update_tree_from_scenarios(tree, tree_idxs, tree_scens)
                 loss = self.metric_loss(jnp.array(tree_vals).ravel(), jnp.array(tree_idxs), jnp.array(scens))
                 self.losses.append(loss)
-                print('iter {}, loss: {}'.format(k, loss))
+                #print('iter {}, loss: {}'.format(k, loss))
             if do_plot and k % 1 == 0:
                 ax.cla()
                 ax.plot(tree_scens, color=self.cm(2))
@@ -251,11 +251,11 @@ class DiffTree(ScenarioTree):
                 self.losses.append(loss)
                 rel_dev = np.abs(loss - past_loss) / past_loss
                 past_loss = loss
-                print('iter {}, loss: {}, rel_dev: {:0.2e}'.format(k, loss, rel_dev))
+                #print('iter {}, loss: {}, rel_dev: {:0.2e}'.format(k, loss, rel_dev))
                 if loss > past_loss:
-                    self.learning_rate *= 0.8
+                    self.learning_rate *= 0.5
                     print('I am setting learning rate from {} to {} since loss increased last step'.format(
-                        self.learning_rate, self.learning_rate * 0.8))
+                        self.learning_rate, self.learning_rate * 0.5))
             if do_plot and k % evaluation_step == 0:
                 ax.cla()
                 replace_var(tree, tree_vals)
