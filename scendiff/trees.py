@@ -237,25 +237,29 @@ class DiffTree(ScenarioTree):
                  do_plot=False, evaluation_step=1, nodes_at_step=None, **kwargs):
         scens = np.array(scens)
         if self.learning_rate is None:
-            self.learning_rate = np.maximum(1 / scens.shape[1], 0.1)
+            self.learning_rate = np.maximum(1 / scens.shape[1], 0.9)
         tree, tree_scens, tree_idxs, tree_vals = super().gen_tree(scens, start_tree, nodes_at_step=nodes_at_step)
         tree, _, tree_vals = self.init_vals(tree, tree_scens, tree_vals, scens)
         k = 0
         rel_dev = 1
+        rel_dev_past = 1
         past_loss = 1e-6
         if do_plot:
             fig, ax = plt.subplots(1, 1)
-        while rel_dev > tol and k < k_max:
+        while rel_dev > tol and rel_dev_past>tol and k < k_max:
             if k % evaluation_step == 0:
                 loss = self.metric_loss(tree_vals, tree_idxs, scens)
                 self.losses.append(loss)
+                rel_dev_past = rel_dev
                 rel_dev = np.abs(loss - past_loss) / past_loss
-                past_loss = loss
-                #print('iter {}, loss: {}, rel_dev: {:0.2e}'.format(k, loss, rel_dev))
-                if loss > past_loss:
-                    self.learning_rate *= 0.5
+                #print('iter {}, loss: {}, rel_dev: {:0.2e}'.format(k, loss, rel_dev)
+                if loss > past_loss and k > 0:
                     print('I am setting learning rate from {} to {} since loss increased last step'.format(
-                        self.learning_rate, self.learning_rate * 0.5))
+                        self.learning_rate, self.learning_rate * 0.8))
+                    self.learning_rate *= 0.8
+                else:
+                    self.learning_rate = 1.01 * self.learning_rate
+                past_loss = loss
             if do_plot and k % evaluation_step == 0:
                 ax.cla()
                 replace_var(tree, tree_vals)
@@ -267,6 +271,7 @@ class DiffTree(ScenarioTree):
                     plt.savefig(join(self.savepath, 'step_{:03d}'.format(k)))
                 plt.pause(0.01)
             g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
+            g = jnp.sign(g)*jnp.minimum(jnp.abs(g), jnp.quantile(jnp.abs(g), 0.99))
             tree_vals -= g * self.learning_rate
             k += 1
 
