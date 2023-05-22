@@ -85,7 +85,7 @@ class ScenarioTree:
 
     def gen_init_tree(self, scens, nodes_at_step=None):
         if nodes_at_step is None:
-            geometric_steps = np.array([2 ** t for t in range(int(np.log(scens.shape[1]) / np.log(2)))][2:])
+            geometric_steps = np.array([2 ** t for t in range(int(np.floor(np.log2(scens.shape[1]))))][1:])
             geometric_progression = np.floor(
                 np.logspace(-1, np.log(len(geometric_steps)) / np.log(10), scens.shape[0])).astype(int)
             reverse_geom_progression = np.max(geometric_progression) - geometric_progression[::-1]
@@ -232,12 +232,14 @@ class DiffTree(ScenarioTree):
                  learning_rate=None):
         super().__init__(tree, nodes_at_step, savepath, init, base_tree)
         self.learning_rate = learning_rate
+        self.max_lr = np.copy(self.learning_rate)
 
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=100, tol=1e-3,
                  do_plot=False, evaluation_step=1, nodes_at_step=None, **kwargs):
         scens = np.array(scens)
         if self.learning_rate is None:
             self.learning_rate = np.maximum(1 / scens.shape[1], 0.9)
+            self.max_lr = self.learning_rate
         tree, tree_scens, tree_idxs, tree_vals = super().gen_tree(scens, start_tree, nodes_at_step=nodes_at_step)
         tree, _, tree_vals = self.init_vals(tree, tree_scens, tree_vals, scens)
         k = 0
@@ -256,9 +258,11 @@ class DiffTree(ScenarioTree):
                 if loss > past_loss and k > 0:
                     print('I am setting learning rate from {} to {} since loss increased last step'.format(
                         self.learning_rate, self.learning_rate * 0.8))
+                    self.max_lr = np.copy(self.learning_rate)
                     self.learning_rate *= 0.8
                 else:
                     self.learning_rate = 1.01 * self.learning_rate
+                    self.learning_rate = np.minimum(self.learning_rate, self.max_lr)
                 past_loss = loss
             if do_plot and k % evaluation_step == 0:
                 ax.cla()
@@ -271,7 +275,7 @@ class DiffTree(ScenarioTree):
                     plt.savefig(join(self.savepath, 'step_{:03d}'.format(k)))
                 plt.pause(0.01)
             g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
-            g = jnp.sign(g)*jnp.minimum(jnp.abs(g), jnp.quantile(jnp.abs(g), 0.99))
+            #g = jnp.sign(g)*jnp.minimum(jnp.abs(g), jnp.quantile(jnp.abs(g), 0.99))
             tree_vals -= g * self.learning_rate
             k += 1
 

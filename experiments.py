@@ -5,7 +5,7 @@ import numpy as np
 from scendiff.trees import NeuralGas, DiffTree, ScenredTree, QuantileTree
 from scendiff.plot_utils import plot_from_graph
 from synthetic_processes import sin_process, random_walk
-from time import time
+from time import time, strftime
 import seaborn as sb
 import matplotlib.pyplot as plt
 from glob import glob
@@ -54,7 +54,7 @@ def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize
 
     [a.legend(fontsize='x-small', ncols=2) for a in ax]
 
-    plt.savefig(join(basepath, '{}_{}_{}_{}.pdf'.format(x, y, effect_1, effect_2, subplot_effect)))
+    plt.savefig(join(basepath, '{}_{}_{}_{}_{}.pdf'.format(strftime("%Y-%m-%d_%H"), x, y, effect_1, effect_2, subplot_effect)))
 
 
 max_iterations = 300
@@ -64,11 +64,11 @@ par_steps = 10
 
 
 models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred'),
-          'dt quant': DiffTree(init='quantiles', base_tree='quantiles'),
+          'dt q-gen': DiffTree(init='quantiles', base_tree='quantiles'),
           'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
-          'ng quant': NeuralGas(init='quantiles', base_tree='quantiles'),
+          'ng q-gen': NeuralGas(init='quantiles', base_tree='quantiles'),
           'scenred': ScenredTree(),
-          'qt': QuantileTree()}
+          'q-gen': QuantileTree()}
 
 
 processes = {'sin': sin_process,
@@ -117,7 +117,8 @@ results = pd.concat(results, axis=0)
 
 if glob(savepath) == []:
     mkdir(savepath)
-results.to_pickle(join(savepath, 'results.pk'))
+
+results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))))
 
 plot_results(results, 'n_scens', 'loss', 'model', subplot_effect='process')
 plot_results(results, 'steps', 'loss', 'model', subplot_effect='process')

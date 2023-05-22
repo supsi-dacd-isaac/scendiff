@@ -20,5 +20,5 @@ def sin_process(steps=24, n_scens=20, double=False):
 
 
 def random_walk(steps=24, n_scens=20):
-    random_walk = np.cumsum(np.linspace(0.01, 0.2, steps) * np.random.randn(n_scens, steps), axis=1)
+    random_walk = np.cumsum(np.linspace(0.01, 0.2, steps) * np.random.randn(n_scens, steps), axis=1).T
     return random_walk
