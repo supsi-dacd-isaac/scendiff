@@ -138,13 +138,14 @@ class ScenarioTree:
         # plot_graph(tree)
         return tree
 
-    def plot_res(self, tree_scens, scens, ax, loss=None):
-        if isinstance(tree_scens, nx.Graph):
-            plot_from_graph(tree_scens, ax=ax, color=self.cm(2))
-        else:
-            ax.plot(tree_scens, color=self.cm(2))
+    def plot_res(self, tree_scens, scens, ax, loss=None, **kwargs):
+        ax.plot(scens, color=self.cm(5), alpha=0.1, linewidth=0.5)
 
-        ax.plot(scens, alpha=0.15, color=self.cm(5))
+        if isinstance(tree_scens, nx.Graph):
+            plot_from_graph(tree_scens, ax=ax, color=self.cm(2), **kwargs)
+        else:
+            ax.plot(tree_scens, color=self.cm(2), **kwargs)
+
         ax.set_xlim(0, scens.shape[0] - 1)
         ax.set_xlabel(r'$T$')
         if loss is not None:

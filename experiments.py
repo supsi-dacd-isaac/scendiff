@@ -170,17 +170,18 @@ rankplot(results)
 # -------------------------------------------------------------------------------------------------------------------- #
 
 models = {'q-gen': QuantileTree(),
-          'ng scenred': NeuralGas(init='scenred', base_tree='scenred',savepath='results/figs/neuralgas/'),
           'scenred': ScenredTree(),
+          'ng scenred': NeuralGas(init='scenred', base_tree='scenred',savepath='results/figs/neuralgas/'),
           'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/'),
           }
 
-_, solutions = parfun((10, 10), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=False)
+_, solutions = parfun((25, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=False)
 
 fig, ax = plt.subplots(3, 4, figsize=(4.5, 4.5))
 plt.subplots_adjust(wspace=0,hspace=0)
 for pm, a in zip(product(processes.keys(), models.keys()), ax.ravel()):
     p, m = pm
-    models[m].plot_res(*solutions[p][m], ax=a)
+    models[m].plot_res(*solutions[p][m], ax=a, alpha=0.3, linewidth=0.5)
 [a.set_yticks([]) for a in ax[:, 1:].ravel()]
 [a.set_xticks([]) for a in ax[:-1, :].ravel()]
+plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
