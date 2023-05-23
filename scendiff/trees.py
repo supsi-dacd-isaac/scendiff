@@ -57,7 +57,7 @@ class ScenarioTree:
                     children = list(tree.successors(j))
                     qs = np.quantile(scens[t + 1, filters[j]], np.linspace(0, 1, len(children) + 1))
                     bins.update({c: [qs[i], qs[i + 1]] for i, c in enumerate(children)})
-                    vals_j = np.quantile(scens[t, filters[j]], np.linspace(0, 1, len(children) + 2)[1:-1])
+                    vals_j = np.quantile(scens[t+1, filters[j]], np.linspace(0, 1, len(children) + 2)[1:-1])
                     for c, v in zip(children, vals_j):
                         vals[c] = v
                         filters[c] = filters[j][(scens[t + 1, filters[j]] > bins[c][0] - 1e-6) &
@@ -138,6 +138,19 @@ class ScenarioTree:
         # plot_graph(tree)
         return tree
 
+    def plot_res(self, tree_scens, scens, ax, loss=None):
+        if isinstance(tree_scens, nx.Graph):
+            plot_from_graph(tree_scens, ax=ax, color=self.cm(2))
+        else:
+            ax.plot(tree_scens, color=self.cm(2))
+
+        ax.plot(scens, alpha=0.15, color=self.cm(5))
+        ax.set_xlim(0, scens.shape[0] - 1)
+        ax.set_xlabel(r'$T$')
+        if loss is not None:
+            plt.title('{}: {:0.3}'.format(r'$d(\xi^{sc}, \xi^{tr})$', loss))
+        return ax
+
     @staticmethod
     @jit
     @partial(vmap, in_axes=(1, None))
@@ -157,7 +170,7 @@ class ScenarioTree:
 
 class NeuralGas(ScenarioTree):
     def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='quantiles'):
-        self.pars = {'lambda_0': 5,
+        self.pars = {'lambda_0': 1,
                      'lambda_f': 0.05,
                      'e0': 5,
                      'ef': 0.05}
@@ -180,10 +193,7 @@ class NeuralGas(ScenarioTree):
                 #print('iter {}, loss: {}'.format(k, loss))
             if do_plot and k % 1 == 0:
                 ax.cla()
-                ax.plot(tree_scens, color=self.cm(2))
-                ax.plot(scens, alpha=0.15, color=self.cm(5))
-                ax.set_xlim(0, scens.shape[0] - 1)
-                plt.title('loss: {:0.3}'.format(loss))
+                self.plot_res(tree_scens, scens, ax, loss)
                 if self.savepath is not None:
                     plt.savefig(join(self.savepath, 'step_{:03d}'.format(k)))
                 plt.pause(0.01)
@@ -267,10 +277,12 @@ class DiffTree(ScenarioTree):
             if do_plot and k % evaluation_step == 0:
                 ax.cla()
                 replace_var(tree, tree_vals)
-                plot_from_graph(tree, ax=ax, color=self.cm(2))
-                ax.plot(scens, alpha=0.15, color=self.cm(5))
-                ax.set_xlim(0, scens.shape[0] - 1)
-                plt.title('loss: {:0.3}'.format(loss))
+                self.plot_res(tree, scens, ax, loss)
+                #plot_from_graph(tree, ax=ax, color=self.cm(2))
+                #ax.plot(scens, alpha=0.15, color=self.cm(5))
+                #ax.set_xlim(0, scens.shape[0] - 1)
+                #ax.set_xlabel(r'$T$')
+                #plt.title('{}: {:0.3}'.format(r'$d(\xi^{sc}, \xi^{tr})$', loss))
                 if self.savepath is not None:
                     plt.savefig(join(self.savepath, 'step_{:03d}'.format(k)))
                 plt.pause(0.01)
