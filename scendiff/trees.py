@@ -139,7 +139,7 @@ class ScenarioTree:
         return tree
 
     def plot_res(self, tree_scens, scens, ax, loss=None, **kwargs):
-        ax.plot(scens, color=self.cm(5), alpha=0.1, linewidth=0.5)
+        ax.plot(scens, color=self.cm(5), alpha=0.2, linewidth=0.5)
 
         if isinstance(tree_scens, nx.Graph):
             plot_from_graph(tree_scens, ax=ax, color=self.cm(2), **kwargs)

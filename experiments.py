@@ -185,3 +185,9 @@ for pm, a in zip(product(processes.keys(), models.keys()), ax.ravel()):
 [a.set_yticks([]) for a in ax[:, 1:].ravel()]
 [a.set_xticks([]) for a in ax[:-1, :].ravel()]
 plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
+
+
+models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/')}
+processes = {'double sin': partial(sin_process, double=True)}
+
+_, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True)
