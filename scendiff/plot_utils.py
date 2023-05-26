@@ -17,10 +17,10 @@ def plot_graph(g, ax=None):
     if ax is None:
         fig = plt.figure()
         ax = plt.gca()
-    groups = set(np.array(list(nx.get_node_attributes(g, 'v').values()))[:, 0])
+    groups = set(np.array(list(nx.get_node_attributes(g, 'v').values())))
     mapping = dict(zip(sorted(groups), count()))
     nodes = g.nodes()
-    colors = [g.nodes[n]['v'][0] for n in nodes]
+    colors = [g.nodes[n]['v'] for n in nodes]
     p = np.array(list(nx.get_node_attributes(g, 'p').values()))
 
     # drawing nodes and edges separately so we can capture collection for colobar
@@ -34,10 +34,13 @@ def plot_graph(g, ax=None):
     return ax, cb
 
 
-def plot_from_graph(g, lines=None, ax=None, color=None, **kwargs):
+def plot_from_graph(g, lines=None, ax=None, color=None, prob=False, **kwargs):
     s_idx, leaves = retrieve_scenarios_indexes(g)
     values = np.array(list(nx.get_node_attributes(g, 'v').values()))
     times = np.array(list(nx.get_node_attributes(g, 't').values()))
+    p = np.array(list(nx.get_node_attributes(g, 'p').values()))
+    v = np.array(list(nx.get_node_attributes(g, 'v').values()))
+    t = np.array(list(nx.get_node_attributes(g, 't').values()))
     cmap = plt.get_cmap('Set1')
     if color is None:
         color = cmap(np.arange(3))[1, :]
@@ -51,6 +54,8 @@ def plot_from_graph(g, lines=None, ax=None, color=None, **kwargs):
         for s in np.arange(s_idx.shape[1]):
             l = ax.plot(values[s_idx[:, s]], color=color, **kwargs)
             lines.append(l[0])
+    if prob:
+        ax.scatter(t, v, s=100 * p, c=color, alpha=0.5)
     return lines
 
 

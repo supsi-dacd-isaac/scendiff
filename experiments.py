@@ -17,7 +17,7 @@ from functools import partial
 
 semaphore = multiprocessing.Semaphore(int(cpu_count()))
 savepath = 'results'
-use_parallel = True
+use_parallel = False
 
 
 def mapper(f, pars, *argv, **kwarg):
@@ -102,9 +102,11 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
                     print('{},{}: {}'.format(s, n, m_name))
                 tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=1e-4)
                 t_1 = time()
+                loss, reliability = m.evaluate_tree(test_scens)
                 results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
                                              'n_scens': np.copy(n), 'steps': np.copy(s), 'time': t_1 - t_0,
-                                             'loss': float(m.losses[-1])}, index=[0]))
+                                             'loss': float(loss),
+                                             'reliability':float(reliability)}, index=[0]))
                 if keep_solutions:
                     sol[m_name] = (tree, test_scens)
             if keep_solutions:

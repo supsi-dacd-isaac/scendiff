@@ -42,3 +42,10 @@ def superimpose_signal_to_tree(x, tree):
 def get_nodes_per_time_from_tree(g):
     times = np.array(list(nx.get_node_attributes(g, 't').values()))
     return [np.sum(times==t) for t in np.unique(times)]
+
+
+def get_scenarios_from_tree(tree):
+    tree_idxs, leaves = retrieve_scenarios_indexes(tree)
+    tree_vals = np.hstack(list(dict(tree.nodes('v')).values()))
+    tree_scens = np.vstack([tree_vals[idx] for idx in tree_idxs])
+    return tree_scens, tree_vals, tree_idxs

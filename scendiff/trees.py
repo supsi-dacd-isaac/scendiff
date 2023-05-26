@@ -3,8 +3,8 @@ import pandas as pd
 from jax import numpy as jnp, jit, vmap, grad
 from functools import partial
 from typing import Tuple, Union
-from scendiff.tree_utils import retrieve_scenarios_indexes, replace_var
-from scendiff.plot_utils import plot_from_graph
+from scendiff.tree_utils import retrieve_scenarios_indexes, replace_var, get_scenarios_from_tree
+from scendiff.plot_utils import plot_from_graph, plot_graph
 from scendiff.scenred import scenred
 from abc import abstractmethod
 import matplotlib.pyplot as plt
@@ -35,10 +35,7 @@ class ScenarioTree:
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=1000, tol=1e-3,
                  nodes_at_step=None):
         tree = self.gen_init_tree(scens, nodes_at_step) if start_tree is None else start_tree
-
-        tree_idxs, leaves = retrieve_scenarios_indexes(tree)
-        tree_vals = np.hstack(list(dict(tree.nodes('v')).values()))
-        tree_scens = np.vstack([tree_vals[idx] for idx in tree_idxs])
+        tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(tree)
         return tree, tree_scens, tree_idxs, tree_vals
 
     def init_vals(self, tree, tree_scens, tree_vals, scens):
@@ -138,19 +135,77 @@ class ScenarioTree:
         # plot_graph(tree)
         return tree
 
-    def plot_res(self, tree_scens, scens, ax, loss=None, **kwargs):
-        ax.plot(scens, color=self.cm(5), alpha=0.1, linewidth=0.5)
+    def plot_res(self, tree, scens, ax, loss=None, prob=False, **kwargs):
+        ax.plot(scens, color=self.cm(5), alpha=0.3, linewidth=0.5)
 
-        if isinstance(tree_scens, nx.Graph):
-            plot_from_graph(tree_scens, ax=ax, color=self.cm(2), **kwargs)
-        else:
-            ax.plot(tree_scens, color=self.cm(2), **kwargs)
+        plot_from_graph(tree, ax=ax, color=self.cm(2), prob=prob, **kwargs)
+
 
         ax.set_xlim(0, scens.shape[0] - 1)
         ax.set_xlabel(r'$T$')
         if loss is not None:
             plt.title('{}: {:0.3}'.format(r'$d(\xi^{sc}, \xi^{tr})$', loss))
         return ax
+
+    def assign_probabilities(self, tree, scens):
+        # assign probabilities to leaves
+        leaves = [k for k, v in nx.get_node_attributes(tree, 't').items() if v == np.max(list(nx.get_node_attributes(tree, 't').values()))]
+        leaf_values = np.array([v for k, v in nx.get_node_attributes(tree, 'v').items() if k in leaves])
+        terminal_scenarios = scens[-1, :]
+        p = 1 / len(terminal_scenarios)
+
+        # reset probabilities in tree
+        nx.set_node_attributes(tree, 0, name='p')
+
+        for v in terminal_scenarios:
+            winning_leaf = np.argmin(np.abs(leaf_values-v))
+            tree.nodes[leaves[winning_leaf]]['p'] += p
+
+        # assign probabilities to internal nodes by summing up the probabilities of their children
+        nodes_prob = {}
+        for n in list(set(tree.nodes) - set(leaves)):
+            nodes_prob[n] = np.sum([tree.nodes[i]['p'] for i in nx.descendants(tree, n)])
+        nx.set_node_attributes(tree, nodes_prob, name='p')
+
+        return tree
+
+    def evaluate_tree(self, scens):
+        tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
+        scen_dist = self.metric_loss(tree_vals, tree_idxs, scens)
+
+        reliability = self.get_reliability(scens)
+        return scen_dist, reliability
+
+
+    def get_reliability(self, scens):
+        """
+        For each timestep, re-assign probability to the tree nodes based on distance, compare with stored probabilities
+        :return:
+        """
+        tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
+        times = np.arange(scens.shape[0])
+        p_dict = nx.get_node_attributes(self.tree, 'p').copy()
+        estimated_p_dict = {k: 0 for k in p_dict.keys()}
+        v_dict = nx.get_node_attributes(self.tree, 'v').copy()
+        p = 1 / scens.shape[1]
+        for t in times:
+            nodes_at_t = np.unique(tree_idxs[t, :])
+            values_at_t = scens[t, :]
+            tree_vals_at_t = np.hstack([v for k, v in v_dict.items() if k in nodes_at_t])
+            for v in values_at_t:
+                winning_leaf = np.argmin(np.abs(tree_vals_at_t - v))
+                estimated_p_dict[nodes_at_t[winning_leaf]]+= p
+
+        """
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+        self.plot_res(self.tree, scens, ax[0], prob=True)
+        nx.set_node_attributes(self.tree, estimated_p_dict, name='p')
+        self.plot_res(self.tree, scens, ax[1], prob=True)
+        """
+
+        reliability = np.mean([np.abs(estimated_p_dict[k] - p_dict[k]) for k in p_dict.keys()])
+        return reliability
+
 
     @staticmethod
     @jit
@@ -194,7 +249,8 @@ class NeuralGas(ScenarioTree):
                 #print('iter {}, loss: {}'.format(k, loss))
             if do_plot and k % 1 == 0:
                 ax.cla()
-                self.plot_res(tree_scens, scens, ax, loss)
+                update_tree_from_scenarios(tree, tree_idxs, tree_scens)
+                self.plot_res(tree, scens, ax, loss)
                 if self.savepath is not None:
                     plt.savefig(join(self.savepath, 'step_{:03d}'.format(k)))
                 plt.pause(0.01)
@@ -220,7 +276,8 @@ class NeuralGas(ScenarioTree):
             k += 1
 
         update_tree_from_scenarios(tree, tree_idxs, tree_scens)
-
+        tree = self.assign_probabilities(tree, scens)
+        self.tree = tree
         return tree, tree_scens, tree_idxs, tree_vals
 
 
@@ -233,8 +290,8 @@ def update_tree_from_scenarios(tree, tree_idxs, tree_scens):
             print('asda')
         assert len(var) == 1, 'smth wrong, var should contain just one obs (all obs in tree_scens at var_pos ' \
                               'should be equal by construction)'
-        tree_vals.append(var)
-    replace_var(tree, tree_vals)
+        tree_vals.append(var.ravel())
+    replace_var(tree, np.hstack(tree_vals))
     return tree_vals
 
 
@@ -293,6 +350,8 @@ class DiffTree(ScenarioTree):
             k += 1
 
         replace_var(tree, tree_vals)
+        tree = self.assign_probabilities(tree, scens)
+        self.tree = tree
         return tree, tree_scens, tree_idxs, tree_vals
 
 
@@ -306,6 +365,8 @@ class ScenredTree(ScenarioTree):
         tree, tree_scens, tree_idxs, tree_vals = super().gen_tree(scens, start_tree, nodes_at_step=nodes_at_step)
         loss = self.metric_loss(tree_vals, tree_idxs, scens)
         self.losses.append(loss)
+        tree = self.assign_probabilities(tree, scens)
+        self.tree = tree
         return tree, tree_scens, tree_idxs, tree_vals
 
 
@@ -320,6 +381,8 @@ class QuantileTree(ScenarioTree):
         tree, tree_scens, tree_vals = self.init_vals(tree, tree_scens, tree_vals, scens)
         loss = self.metric_loss(tree_vals, tree_idxs, scens)
         self.losses.append(loss)
+        tree = self.assign_probabilities(tree, scens)
+        self.tree = tree
         return tree, tree_scens, tree_idxs, tree_vals
 
 
