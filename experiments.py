@@ -17,7 +17,7 @@ from functools import partial
 
 semaphore = multiprocessing.Semaphore(int(cpu_count()))
 savepath = 'results'
-use_parallel = False
+use_parallel = True
 
 
 def mapper(f, pars, *argv, **kwarg):
@@ -131,7 +131,7 @@ else:
     for p in pars:
         results.append(parfun(p, processes, models, max_iterations=max_iterations))
 
-    results = pd.concat(results, axis=0)
+results = pd.concat(results, axis=0)
 
 if glob(savepath) == []:
     mkdir(savepath)
@@ -149,13 +149,14 @@ plot_results(results, '$T$',  r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effec
 plot_results(results, '$T$',  't [s]', 'model', subplot_effect='process', figsize=(4.5, 2.5), textpos=(0.05, 0.9), semilog=True)
 plot_results(results, '$T$',  't [s]', 'model', figsize=(4.5, 2.5), semilog=True)
 plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5))
+plot_results(results, '$N$', 'reliability', 'model', figsize=(4.5, 2.5))
 
-def rankplot(df):
+
+def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$'):
     rankmatrix = np.nan *np.zeros((len(df.model.unique()), len(df.model.unique())))
     for i, m in enumerate(df.model.unique()):
         for j, n in enumerate(df.model.unique()):
-            if j>i:
-                rankmatrix[i, j] = np.sum(df[df.model == m][r'$d(\xi^{sc}, \xi^{tr})$'].values < df[df.model == n][r'$d(\xi^{sc}, \xi^{tr})$'].values)
+            rankmatrix[i, j] = np.sum(df[df.model == m][key].values < df[df.model == n][key].values)
 
     sb.set_style('whitegrid')
     fig, ax = plt.subplots(1, 1, figsize=(4.5, 3))
@@ -166,6 +167,7 @@ def rankplot(df):
     plt.savefig(join(savepath, '{}_rankplot.pdf'.format(strftime("%Y-%m-%d_%H"))))
 
 rankplot(results)
+rankplot(results, key='reliability')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------  obtain animations and final solutions ------------------------------------------------- #
@@ -190,6 +192,6 @@ plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 
 
 models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/')}
-processes = {'double sin': partial(sin_process, double=True)}
+processes = {'double sin': partial(sin_process, double=True),}
 
 _, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True)

@@ -306,10 +306,11 @@ class DiffTree(ScenarioTree):
                  do_plot=False, evaluation_step=1, nodes_at_step=None, **kwargs):
         scens = np.array(scens)
         if self.learning_rate is None:
-            self.learning_rate = np.maximum(1 / scens.shape[1], 0.9)
+            self.learning_rate = 0.9
             self.max_lr = self.learning_rate
         tree, tree_scens, tree_idxs, tree_vals = super().gen_tree(scens, start_tree, nodes_at_step=nodes_at_step)
         tree, _, tree_vals = self.init_vals(tree, tree_scens, tree_vals, scens)
+        ps = np.array([len(nx.descendants(tree, i))+1 for i in tree.nodes])
         k = 0
         rel_dev = 1
         rel_dev_past = 1
@@ -346,7 +347,7 @@ class DiffTree(ScenarioTree):
                 plt.pause(0.01)
             g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
             #g = jnp.sign(g)*jnp.minimum(jnp.abs(g), jnp.quantile(jnp.abs(g), 0.99))
-            tree_vals -= g * self.learning_rate
+            tree_vals -= g * self.learning_rate / ps
             k += 1
 
         replace_var(tree, tree_vals)
