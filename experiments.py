@@ -93,6 +93,7 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
         s, n = pars
         t_00 = time()
         solutions = {}
+        nodes_at_step = np.linspace(2, s, s).astype(int)
         for p_name, p in processes.items():
             test_scens = p(steps=s, n_scens=n)
             sol = {}
@@ -100,7 +101,9 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
                 t_0 = time()
                 if do_plot:
                     print('{},{}: {}'.format(s, n, m_name))
-                tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=1e-4)
+                #do_plot = True if m_name == 'dt scenred' and p_name == 'double sin' else False
+                tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=1e-4,
+                                           nodes_at_step=nodes_at_step)
                 t_1 = time()
                 loss, reliability = m.evaluate_tree(test_scens)
                 results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),

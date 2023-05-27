@@ -112,8 +112,7 @@ class ScenarioTree:
                 if t == 0:
                     continue
                 names_of_nodes_at_t = []
-                child_per_par = n_t / nodes_at_step[t - 1]
-                assert child_per_par == np.floor(child_per_par), 'children must be multiple of parent or the same'
+                child_per_par = np.floor(n_t / nodes_at_step[t - 1]).astype(int)
                 child_per_par = int(child_per_par)
                 for p in names_of_nodes_at_previous_step:
                     for c in range(child_per_par):
@@ -121,6 +120,15 @@ class ScenarioTree:
                         tree.add_node(k, t=t, p=1 / n_t, v=np.atleast_1d(0))
                         tree.add_edge(p, k)
                         k += 1
+                if n_t % nodes_at_step[t - 1]>0:
+                    additionals = n_t % nodes_at_step[t - 1]
+                    lucky_parents = np.random.choice(names_of_nodes_at_previous_step, additionals, replace=False)
+                    for p in lucky_parents:
+                        names_of_nodes_at_t.append(k)
+                        tree.add_node(k, t=t, p=1 / n_t, v=np.atleast_1d(0))
+                        tree.add_edge(p, k)
+                        k += 1
+
                 names_of_nodes_at_previous_step = np.copy(names_of_nodes_at_t)
 
             leaves = [n for n, time in nx.get_node_attributes(tree, 't').items() if time == len(nodes_at_step) - 1]
