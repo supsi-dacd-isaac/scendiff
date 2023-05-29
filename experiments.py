@@ -16,7 +16,7 @@ from itertools import product
 from functools import partial
 
 semaphore = multiprocessing.Semaphore(int(cpu_count()))
-savepath = 'results'
+savepath = 'results/combined'
 use_parallel = True
 
 
@@ -63,13 +63,12 @@ def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize
 
 
 max_iterations = 300
-scens_min, scens_max = 10, 100
-steps_min, steps_max = 10, 100
-par_steps = 10
+par_steps = 11
 
 
-models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred'),
-          'dt q-gen': DiffTree(init='quantiles', base_tree='quantiles'),
+models = {'difft-c scenred': DiffTree(init='scenred', base_tree='scenred', loss='combined'),
+          'difft scenred': DiffTree(init='scenred', base_tree='scenred'),
+          'difft q-gen': DiffTree(init='quantiles', base_tree='quantiles'),
           'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
           'ng q-gen': NeuralGas(init='quantiles', base_tree='quantiles'),
           'scenred': ScenredTree(),
@@ -79,12 +78,6 @@ models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred'),
 processes = {'sin': sin_process,
              'double sin': partial(sin_process, double=True),
              'random walk': random_walk}
-
-parameters = {'n_scens': np.linspace(scens_min, scens_max, par_steps, dtype=int),
-              'steps': np.linspace(steps_min, steps_max, par_steps, dtype=int)}
-
-
-pars = list(product(parameters['steps'], parameters['n_scens']))
 
 
 def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solutions=False):
@@ -127,14 +120,43 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
 # ----------------------------------------  obtain results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-if use_parallel:
-    results = mapper(parfun, pars, processes, models, max_iterations=max_iterations)
-else:
-    results = []
-    for p in pars:
-        results.append(parfun(p, processes, models, max_iterations=max_iterations))
+if glob(savepath) == []:
+    mkdir(savepath)
 
-results = pd.concat(results, axis=0)
+scens_min, scens_max = 10, 210
+steps_min, steps_max = 10, 110
+par_steps = 11
+scensspace = np.linspace(scens_min, scens_max, par_steps, dtype=int)
+stepsspace = np.linspace(steps_min, steps_max, par_steps, dtype=int)
+print('###### number of scenarios tested: ######')
+print(scensspace)
+print('###### number of steps tested: ######')
+print(stepsspace)
+parameters = {'n_scens': scensspace,
+              'steps': stepsspace}
+pars = list(product(parameters['steps'], parameters['n_scens']))
+# find a separation of tested pars such that total numbers of nodes (times*scenarios) in each partition is ~same
+n_tot = np.cumsum([t*n for t, n in pars])
+splits = np.quantile(n_tot, np.hstack([0, 2**(-np.linspace(1, 0, 6))]), method='nearest')
+cut_points = np.where(np.isin(n_tot, splits))[0]
+bins = [(a, cut_points[i+1]) for i, a in enumerate(cut_points[:-1])]
+print([np.sum([a[0]*a[1] for a in pars[b[0]:b[1]]]) for i, b in enumerate(bins)])
+
+all_res = []
+for b in bins:
+    bin_pars = pars[b[0]:b[1]]
+    print('obtaining these combinations of times and scenarios:')
+    print(bin_pars)
+    if use_parallel:
+        results = mapper(parfun, bin_pars, processes, models, max_iterations=max_iterations)
+    else:
+        results = []
+        for p in bin_pars:
+            results.append(parfun(p, processes, models, max_iterations=max_iterations))
+    all_res.append(pd.concat(results, axis=0))
+
+results = pd.concat(all_res, axis=0)
+
 
 if glob(savepath) == []:
     mkdir(savepath)
@@ -179,12 +201,14 @@ rankplot(results, key='reliability')
 models = {'q-gen': QuantileTree(),
           'scenred': ScenredTree(),
           'ng scenred': NeuralGas(init='scenred', base_tree='scenred',savepath='results/figs/neuralgas/'),
-          'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/'),
+          'difft-c scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/', loss='combined'),
           }
 
 _, solutions = parfun((25, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=False)
 
+sb.set_style('white')
 fig, ax = plt.subplots(3, 4, figsize=(4.5, 4.5))
+
 plt.subplots_adjust(wspace=0,hspace=0)
 for pm, a in zip(product(processes.keys(), models.keys()), ax.ravel()):
     p, m = pm
@@ -194,7 +218,8 @@ for pm, a in zip(product(processes.keys(), models.keys()), ax.ravel()):
 plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 
 
-models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/')}
+models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/', loss='combined')}
 processes = {'double sin': partial(sin_process, double=True),}
 
 _, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True)
+

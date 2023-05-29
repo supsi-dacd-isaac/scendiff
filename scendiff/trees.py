@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
-from jax import numpy as jnp, jit, vmap, grad
+from jax import numpy as jnp
+from jax import lax, jit, vmap, grad
+import jax.ops as jops
 from functools import partial
 from typing import Tuple, Union
 from scendiff.tree_utils import retrieve_scenarios_indexes, replace_var, get_scenarios_from_tree
@@ -214,6 +216,21 @@ class ScenarioTree:
         reliability = np.mean([np.abs(estimated_p_dict[k] - p_dict[k]) for k in p_dict.keys()])
         return reliability
 
+    @staticmethod
+    @jit
+    def metric_loss_t(tree_vals, tree_idxs, scens):
+        tot_dist = jnp.array(0)
+        tree_scens = jnp.vstack([tree_vals[i] for i in tree_idxs.T]).T
+        for tree_vals_t in tree_scens.T:
+            dists = ScenarioTree.compute_distances(scens, tree_vals_t)
+            tot_dist += jnp.mean(dists)
+        return tot_dist
+
+    @staticmethod
+    @jit
+    @partial(vmap, in_axes=(1, None))
+    def compute_kernel_distances(scens, x):
+        return jnp.mean(jnp.exp(-((x - scens)/10) ** 2)*((x - scens) ** 2))
 
     @staticmethod
     @jit
@@ -305,10 +322,11 @@ def update_tree_from_scenarios(tree, tree_idxs, tree_scens):
 
 class DiffTree(ScenarioTree):
     def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='scenred',
-                 learning_rate=None):
+                 learning_rate=None, loss='scen_dist'):
         super().__init__(tree, nodes_at_step, savepath, init, base_tree)
         self.learning_rate = learning_rate
         self.max_lr = np.copy(self.learning_rate)
+        self.loss = loss
 
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=100, tol=1e-3,
                  do_plot=False, evaluation_step=1, nodes_at_step=None, **kwargs):
@@ -334,9 +352,9 @@ class DiffTree(ScenarioTree):
                 #print('iter {}, loss: {}, rel_dev: {:0.2e}'.format(k, loss, rel_dev)
                 if loss > past_loss and k > 0:
                     print('I am setting learning rate from {} to {} since loss increased last step'.format(
-                        self.learning_rate, self.learning_rate * 0.8))
+                        self.learning_rate, self.learning_rate * 0.5))
                     self.max_lr = np.copy(self.learning_rate)
-                    self.learning_rate *= 0.8
+                    self.learning_rate *= 0.5
                 else:
                     self.learning_rate = 1.01 * self.learning_rate
                     self.learning_rate = np.minimum(self.learning_rate, self.max_lr)
@@ -345,15 +363,17 @@ class DiffTree(ScenarioTree):
                 ax.cla()
                 replace_var(tree, tree_vals)
                 self.plot_res(tree, scens, ax, loss)
-                #plot_from_graph(tree, ax=ax, color=self.cm(2))
-                #ax.plot(scens, alpha=0.15, color=self.cm(5))
-                #ax.set_xlim(0, scens.shape[0] - 1)
-                #ax.set_xlabel(r'$T$')
-                #plt.title('{}: {:0.3}'.format(r'$d(\xi^{sc}, \xi^{tr})$', loss))
                 if self.savepath is not None:
                     plt.savefig(join(self.savepath, 'step_{:03d}'.format(k)))
                 plt.pause(0.01)
-            g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
+            if self.loss == 'scen_dist':
+                g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
+            elif self.loss == 'combined':
+                tree = self.assign_probabilities(tree, scens)
+                p_vals = np.hstack(list(dict(tree.nodes('p')).values()))
+                tree_scens = jnp.vstack([tree_vals[i] for i in tree_idxs.T]).T
+                g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
+                g += grad(partial(self.metric_loss_t, tree_idxs=tree_idxs, scens=scens))(tree_vals)
             #g = jnp.sign(g)*jnp.minimum(jnp.abs(g), jnp.quantile(jnp.abs(g), 0.99))
             tree_vals -= g * self.learning_rate / ps
             k += 1
