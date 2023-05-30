@@ -31,7 +31,7 @@ def mapper(f, pars, *argv, **kwarg):
 
 
 def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize=(4.5, 3), basepath='results',
-                 textpos=(0.05, 0.6), semilog=False):
+                 textpos=(0.05, 0.6), semilog=False, ax=None):
 
     x_plots = 1
     if subplot_effect is not None:
@@ -45,7 +45,8 @@ def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize
             ax[i].text(*textpos, '{}={}'.format(subplot_effect, se), transform=ax[i].transAxes, fontsize=9)
         plt.subplots_adjust(bottom=0.08, left=0.15, right=0.99, hspace=0.02, top=0.98)
     else:
-        fig, ax = plt.subplots(x_plots, 1, figsize=figsize)
+        if ax is None:
+            fig, ax = plt.subplots(x_plots, 1, figsize=figsize)
         sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df, ax=ax)
         plt.subplots_adjust(bottom=0.2, left=0.15, wspace=0.3, hspace=0.3, top=0.98)
 
@@ -169,38 +170,55 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # -------------------------------------------------------------------------------------------------------------------- #
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
-results = pd.read_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))))
+results = pd.read_pickle(join(savepath, 'results_{}.pk'.format("2023-05-30_13")))
+
 results.rename({'n_scens': r'$N$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
+results.rename({'scen dist test': r'$d(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$'}, axis=1, inplace=True)
 
-#plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
-#plot_results(results, '$T$',  r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
-plot_results(results, '$T$',  't [s]', 'model', subplot_effect='process', figsize=(4.5, 2.5), textpos=(0.05, 0.9), semilog=True)
-plot_results(results, '$T$',  't [s]', 'model', figsize=(4.5, 2.5), semilog=True)
-plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5))
-plot_results(results, '$N$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5))
-plot_results(results, '$T$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5))
-plot_results(results, '$T$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5))
-plot_results(results, '$N$', 'reliability', 'model', figsize=(4.5, 2.5))
-plot_results(results, '$T$', 'reliability', 'model', figsize=(4.5, 2.5))
+sb.set_style('darkgrid')
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
+plot_results(results, '$T$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$T$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+plot_results(results, '$T$', 'reliability', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
+plt.semilogy()
+[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+[a.get_legend().remove() for a in ax.ravel()[1:]]
+plt.savefig(join(savepath, 'results_T_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
+plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$N$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+plot_results(results, '$N$', 'reliability', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
+plt.semilogy()
+[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+[a.get_legend().remove() for a in ax.ravel()[1:]]
+plt.savefig(join(savepath, 'results_N_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
-def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$'):
+def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
     rankmatrix = np.nan *np.zeros((len(df.model.unique()), len(df.model.unique())))
     for i, m in enumerate(df.model.unique()):
         for j, n in enumerate(df.model.unique()):
             rankmatrix[i, j] = np.sum(df[df.model == m][key].values < df[df.model == n][key].values)
 
     sb.set_style('whitegrid')
-    fig, ax = plt.subplots(1, 1, figsize=(4.5, 3))
-    sb.heatmap(rankmatrix, annot=True, ax=ax, cmap='Blues', cbar=False, fmt='g')
+    if ax is None:
+        fig, ax = plt.subplots(1, 1, figsize=(4.5, 3))
+    sb.heatmap(rankmatrix, annot=True, ax=ax, cmap='Blues', cbar=False, fmt='g',xticklabels=
+               df.model.unique(), yticklabels=df.model.unique())
     ax.set_xticklabels(df.model.unique(), rotation=45)
     ax.set_yticklabels(df.model.unique(), rotation=0)
     plt.subplots_adjust(bottom=0.25, left=0.25, wspace=0.3, hspace=0.3)
     plt.savefig(join(savepath, '{}_{}_rankplot.pdf'.format(key, strftime("%Y-%m-%d_%H"))))
 
-rankplot(results)
-rankplot(results, key='reliability')
-rankplot(results, key=r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$')
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
+rankplot(results, ax=ax[0])
+rankplot(results, key='reliability', ax=ax[1])
+rankplot(results, key=r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', ax=ax[2])
+plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
+[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------  obtain animations and final solutions ------------------------------------------------- #
