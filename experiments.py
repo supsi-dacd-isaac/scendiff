@@ -76,7 +76,7 @@ processes = {'sin': sin_process,
              'random walk': random_walk}
 
 
-def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solutions=False):
+def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solutions=False, tol=1e-4):
     with semaphore:
         results = []
         s, n = pars
@@ -85,21 +85,27 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
         nodes_at_step = np.linspace(2, s, s).astype(int)
         for p_name, p in processes.items():
             test_scens = p(steps=s, n_scens=n)
+            test_scens_ex_post = p(steps=s, n_scens=500)
             sol = {}
             for m_name, m in models.items():
                 t_0 = time()
                 if do_plot:
                     print('{},{}: {}'.format(s, n, m_name))
                 #do_plot = True if m_name == 'dt scenred' and p_name == 'double sin' else False
-                tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=1e-4,
+                tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=tol,
                                            nodes_at_step=nodes_at_step)
                 t_1 = time()
                 scen_dist, t_dist, reliability = m.evaluate_tree(test_scens)
+                scen_dist_ex_post, t_dist_ex_post, reliability_ex_post = m.evaluate_tree(test_scens_ex_post)
                 results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
                                              'n_scens': np.copy(n), 'steps': np.copy(s), 'time': t_1 - t_0,
                                              'scen dist': float(scen_dist),
                                              't dist': float(t_dist),
-                                             'reliability': float(reliability)}, index=[0]))
+                                             'reliability': float(reliability),
+                                             'scen dist test': float(scen_dist_ex_post),
+                                             't dist test': float(t_dist_ex_post),
+                                             'reliability test': float(reliability_ex_post)
+                                             }, index=[0]))
                 if keep_solutions:
                     sol[m_name] = (tree, test_scens)
             if keep_solutions:
@@ -163,7 +169,7 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # -------------------------------------------------------------------------------------------------------------------- #
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
-
+results = pd.read_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))))
 results.rename({'n_scens': r'$N$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
 
 #plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
@@ -223,5 +229,5 @@ plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/', loss='combined')}
 processes = {'double sin': partial(sin_process, double=True),}
 
-_, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True)
+_, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True, tol=1e-5)
 

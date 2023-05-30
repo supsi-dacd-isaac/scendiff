@@ -186,7 +186,6 @@ class ScenarioTree:
         reliability = self.get_reliability(scens)
         return scen_dist, t_dist, reliability
 
-
     def get_reliability(self, scens):
         """
         For each timestep, re-assign probability to the tree nodes based on distance, compare with stored probabilities
@@ -332,8 +331,8 @@ class DiffTree(ScenarioTree):
                  do_plot=False, evaluation_step=1, nodes_at_step=None, **kwargs):
         scens = np.array(scens)
         if self.learning_rate is None:
-            self.learning_rate = 0.9
-            self.max_lr = self.learning_rate
+            self.learning_rate = 0.1
+            self.max_lr = self.learning_rate*5
         tree, tree_scens, tree_idxs, tree_vals = super().gen_tree(scens, start_tree, nodes_at_step=nodes_at_step)
         tree, _, tree_vals = self.init_vals(tree, tree_scens, tree_vals, scens)
         ps = np.array([len(nx.descendants(tree, i))+1 for i in tree.nodes])
@@ -345,7 +344,11 @@ class DiffTree(ScenarioTree):
             fig, ax = plt.subplots(1, 1)
         while rel_dev > tol and rel_dev_past>tol and k < k_max:
             if k % evaluation_step == 0:
-                loss = self.metric_loss(tree_vals, tree_idxs, scens)
+                if self.loss == 'scen_dist':
+                    loss = self.metric_loss(tree_vals, tree_idxs, scens)
+                elif self.loss == 'combined':
+                    loss = self.metric_loss(tree_vals, tree_idxs, scens) + self.metric_loss_t(tree_scens, tree_idxs, scens)
+
                 self.losses.append(loss)
                 rel_dev_past = rel_dev
                 rel_dev = np.abs(loss - past_loss) / past_loss
@@ -370,7 +373,6 @@ class DiffTree(ScenarioTree):
                 g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
             elif self.loss == 'combined':
                 tree = self.assign_probabilities(tree, scens)
-                p_vals = np.hstack(list(dict(tree.nodes('p')).values()))
                 tree_scens = jnp.vstack([tree_vals[i] for i in tree_idxs.T]).T
                 g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
                 g += grad(partial(self.metric_loss_t, tree_idxs=tree_idxs, scens=scens))(tree_vals)
