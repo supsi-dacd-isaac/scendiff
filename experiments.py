@@ -23,10 +23,6 @@ use_parallel = True
 def mapper(f, pars, *argv, **kwarg):
     poolsize = cpu_count() - 1
     pool = Pool(poolsize)
-    #for p in [(p, *argv, *list(kwarg.values())) for p in pars]:
-    #    res = pool.apply_async(f,  p)
-    # parallel process over shared object
-    #pool = multiprocessing.Semaphore(cpu_count() - 1)
     res = pool.starmap_async(f, [(p, *argv, *list(kwarg.values())) for p in pars])
     a = res.get()
     pool.close()
@@ -98,11 +94,12 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
                 tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=1e-4,
                                            nodes_at_step=nodes_at_step)
                 t_1 = time()
-                loss, reliability = m.evaluate_tree(test_scens)
+                scen_dist, t_dist, reliability = m.evaluate_tree(test_scens)
                 results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
                                              'n_scens': np.copy(n), 'steps': np.copy(s), 'time': t_1 - t_0,
-                                             'loss': float(loss),
-                                             'reliability':float(reliability)}, index=[0]))
+                                             'scen dist': float(scen_dist),
+                                             't dist': float(t_dist),
+                                             'reliability': float(reliability)}, index=[0]))
                 if keep_solutions:
                     sol[m_name] = (tree, test_scens)
             if keep_solutions:
@@ -167,14 +164,18 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 
-results.rename({'n_scens': r'$N$', 'loss': r'$d(\xi^{sc}, \xi^{tr})$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
+results.rename({'n_scens': r'$N$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
 
-plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
-plot_results(results, '$T$',  r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
+#plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
+#plot_results(results, '$T$',  r'$d(\xi^{sc}, \xi^{tr})$', 'model', subplot_effect='process', figsize=(4.5, 2.5))
 plot_results(results, '$T$',  't [s]', 'model', subplot_effect='process', figsize=(4.5, 2.5), textpos=(0.05, 0.9), semilog=True)
 plot_results(results, '$T$',  't [s]', 'model', figsize=(4.5, 2.5), semilog=True)
 plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5))
+plot_results(results, '$N$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5))
+plot_results(results, '$T$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5))
+plot_results(results, '$T$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5))
 plot_results(results, '$N$', 'reliability', 'model', figsize=(4.5, 2.5))
+plot_results(results, '$T$', 'reliability', 'model', figsize=(4.5, 2.5))
 
 
 def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$'):
@@ -189,10 +190,11 @@ def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$'):
     ax.set_xticklabels(df.model.unique(), rotation=45)
     ax.set_yticklabels(df.model.unique(), rotation=0)
     plt.subplots_adjust(bottom=0.25, left=0.25, wspace=0.3, hspace=0.3)
-    plt.savefig(join(savepath, '{}_rankplot.pdf'.format(strftime("%Y-%m-%d_%H"))))
+    plt.savefig(join(savepath, '{}_{}_rankplot.pdf'.format(key, strftime("%Y-%m-%d_%H"))))
 
 rankplot(results)
 rankplot(results, key='reliability')
+rankplot(results, key=r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$')
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------  obtain animations and final solutions ------------------------------------------------- #

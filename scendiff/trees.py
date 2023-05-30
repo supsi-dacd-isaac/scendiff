@@ -182,9 +182,9 @@ class ScenarioTree:
     def evaluate_tree(self, scens):
         tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
         scen_dist = self.metric_loss(tree_vals, tree_idxs, scens)
-
+        t_dist = self.metric_loss_t(tree_vals, tree_idxs, scens)
         reliability = self.get_reliability(scens)
-        return scen_dist, reliability
+        return scen_dist, t_dist, reliability
 
 
     def get_reliability(self, scens):
@@ -221,9 +221,9 @@ class ScenarioTree:
     def metric_loss_t(tree_vals, tree_idxs, scens):
         tot_dist = jnp.array(0)
         tree_scens = jnp.vstack([tree_vals[i] for i in tree_idxs.T]).T
-        for tree_vals_t in tree_scens.T:
-            dists = ScenarioTree.compute_distances(scens, tree_vals_t)
-            tot_dist += jnp.mean(dists)
+        for tree_vals_t, scen_vals_t in zip(tree_scens, scens):
+            dists = jnp.min((scen_vals_t.reshape(-1, 1) - tree_vals_t.reshape(1, -1))**2, axis=1)
+            tot_dist += jnp.sum(dists)
         return tot_dist
 
     @staticmethod
