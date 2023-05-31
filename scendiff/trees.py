@@ -119,16 +119,22 @@ class ScenarioTree:
                 for p in names_of_nodes_at_previous_step:
                     for c in range(child_per_par):
                         names_of_nodes_at_t.append(k)
-                        tree.add_node(k, t=t, p=1 / n_t, v=np.atleast_1d(0))
+                        tree.add_node(k, t=t, p=tree.nodes[p]['p']/child_per_par, v=np.atleast_1d(0))
                         tree.add_edge(p, k)
                         k += 1
                 if n_t % nodes_at_step[t - 1]>0:
                     additionals = n_t % nodes_at_step[t - 1]
-                    lucky_parents = np.random.choice(names_of_nodes_at_previous_step, additionals, replace=False)
+                    parents_ps = {k: v for k, v in nx.get_node_attributes(tree, 'p').items() if k in names_of_nodes_at_previous_step}
+                    parents_sorted_by_p = np.array(list(dict(sorted(parents_ps.items(), key=lambda item: item[1],reverse=True)).keys()))
+                    lucky_parents = parents_sorted_by_p[:additionals]
+                    #lucky_parents = np.random.choice(names_of_nodes_at_previous_step, additionals, replace=False)
                     for p in lucky_parents:
+                        children_p = tree.nodes[p]['p'] / (child_per_par + 1)
+                        nx.set_node_attributes(tree, {c: children_p for c in nx.descendants(tree, p)}, name='p')
                         names_of_nodes_at_t.append(k)
-                        tree.add_node(k, t=t, p=1 / n_t, v=np.atleast_1d(0))
+                        tree.add_node(k, t=t, p=children_p, v=np.atleast_1d(0))
                         tree.add_edge(p, k)
+
                         k += 1
 
                 names_of_nodes_at_previous_step = np.copy(names_of_nodes_at_t)

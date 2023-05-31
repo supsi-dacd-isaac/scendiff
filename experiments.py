@@ -1,5 +1,4 @@
 import multiprocessing
-
 import pandas as pd
 import numpy as np
 from scendiff.trees import NeuralGas, DiffTree, ScenredTree, QuantileTree
@@ -172,57 +171,40 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 #results = pd.read_pickle(join(savepath, 'results_{}.pk'.format("2023-05-30_19")))
+get_nodes = lambda t: np.sum(np.linspace(2, t, t).astype(int)-1)
+results.rename({'n_scens': r'$S$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$d_d(\xi^{sc}, \xi^{tr})$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
+results.rename({'scen dist test': r'$d(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$d_d(\xi^{sc, te}, \xi^{tr})$'}, axis=1, inplace=True)
+results.rename({'reliability': r'$\mathcal{R}$', 'reliability test': r'$\mathcal{R}_{te}$'}, axis=1, inplace=True)
 
-results.rename({'n_scens': r'$N$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
-results.rename({'scen dist test': r'$d(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$'}, axis=1, inplace=True)
-
-sb.set_style('darkgrid')
-fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$T$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$T$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
-plt.semilogy()
-plot_results(results, '$T$', 'reliability', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
-ax[1].semilogy()
-[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
-[a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_T_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
-
-fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$N$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
-ax[1].semilogy()
-plot_results(results, '$N$', 'reliability', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
-plt.semilogy()
-[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
-[a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_N_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+results['$N$'] = results['$T$'].apply(get_nodes)
+results[r'$\frac{V}{N}$'] = results['$N$'] / results['$S$']
+results[r'$\frac{V}{NT}$'] = results['$N$'] / results['$S$']/results['$T$']
 
 
 sb.set_style('darkgrid')
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$T$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$T$', r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+plot_results(results, '$S$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$S$', r'$d_d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1])
 ax[1].semilogy()
-plot_results(results, '$T$', 'reliability test', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
-plt.semilogy()
-[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+plot_results(results, '$N$', r'$\mathcal{R}$', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
+ax[2].semilogx()
 [a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_T_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+plt.savefig(join(savepath, 'results_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$N$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$N$', r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+plot_results(results, '$S$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$S$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1])
 ax[1].semilogy()
-plot_results(results, '$N$', 'reliability test', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
-plt.semilogy()
-[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+plot_results(results, '$N$', r'$\mathcal{R}_{te}$', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
+ax[2].semilogx()
 [a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_N_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+plt.savefig(join(savepath, 'results_test{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
+
+plot_results(results, '$T$', 't [s]', 'model', figsize=(4.5, 2.5))
 
 def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
     rankmatrix = np.nan *np.zeros((len(df.model.unique()), len(df.model.unique())))
@@ -243,8 +225,8 @@ def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
 rankplot(results, ax=ax[0])
-rankplot(results, key='reliability', ax=ax[1])
-rankplot(results, key=r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', ax=ax[2])
+rankplot(results, key=r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', ax=ax[1])
+rankplot(results, key=r'$\mathcal{R}$', ax=ax[2])
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
@@ -252,8 +234,8 @@ plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), b
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
 rankplot(results, key=r'$d(\xi^{sc, te}, \xi^{tr})$',ax=ax[0])
-rankplot(results, key='reliability test', ax=ax[1])
-rankplot(results, key=r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', ax=ax[2])
+rankplot(results, key=r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', ax=ax[1])
+rankplot(results, key=r'$\mathcal{R}_{te}$', ax=ax[2])
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
