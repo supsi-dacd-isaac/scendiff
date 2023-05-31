@@ -331,7 +331,7 @@ class DiffTree(ScenarioTree):
                  do_plot=False, evaluation_step=1, nodes_at_step=None, **kwargs):
         scens = np.array(scens)
         if self.learning_rate is None:
-            self.learning_rate = 0.1
+            self.learning_rate = 0.9
             self.max_lr = self.learning_rate*5
         tree, tree_scens, tree_idxs, tree_vals = super().gen_tree(scens, start_tree, nodes_at_step=nodes_at_step)
         tree, _, tree_vals = self.init_vals(tree, tree_scens, tree_vals, scens)
@@ -356,6 +356,7 @@ class DiffTree(ScenarioTree):
                 if loss > past_loss and k > 0:
                     print('I am setting learning rate from {} to {} since loss increased last step'.format(
                         self.learning_rate, self.learning_rate * 0.5))
+                    tree_vals += g * self.learning_rate / ps
                     self.max_lr = np.copy(self.learning_rate)
                     self.learning_rate *= 0.5
                 else:

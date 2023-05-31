@@ -15,6 +15,7 @@ from multiprocessing import Pool, cpu_count
 from itertools import product
 from functools import partial
 
+np.random.seed(10)
 semaphore = multiprocessing.Semaphore(int(cpu_count()))
 savepath = 'results/combined'
 use_parallel = True
@@ -114,7 +115,7 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
         plt.close('all')
         del test_scens
         print('{},{}: {:0.1f} min'.format(s, n, (time() - t_00)/60))
-        print(pd.concat(results))
+        print(pd.concat(results)[['model', 'process', 'n_scens', 'steps', 'time', 'scen dist', 't dist', 'reliability']])
         if keep_solutions:
             return pd.concat(results), solutions
         return pd.concat(results)
@@ -170,7 +171,7 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # -------------------------------------------------------------------------------------------------------------------- #
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
-results = pd.read_pickle(join(savepath, 'results_{}.pk'.format("2023-05-30_13")))
+#results = pd.read_pickle(join(savepath, 'results_{}.pk'.format("2023-05-30_19")))
 
 results.rename({'n_scens': r'$N$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
 results.rename({'scen dist test': r'$d(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$'}, axis=1, inplace=True)
@@ -179,9 +180,10 @@ sb.set_style('darkgrid')
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
 plot_results(results, '$T$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
 plot_results(results, '$T$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+plt.semilogy()
 plot_results(results, '$T$', 'reliability', 'model', figsize=(4.5, 2.5), ax=ax[2])
 plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
-plt.semilogy()
+ax[1].semilogy()
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 [a.get_legend().remove() for a in ax.ravel()[1:]]
 plt.savefig(join(savepath, 'results_T_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
@@ -189,6 +191,7 @@ plt.savefig(join(savepath, 'results_T_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
 plot_results(results, '$N$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
 plot_results(results, '$N$', r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+ax[1].semilogy()
 plot_results(results, '$N$', 'reliability', 'model', figsize=(4.5, 2.5), ax=ax[2])
 plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
 plt.semilogy()
@@ -196,12 +199,37 @@ plt.semilogy()
 [a.get_legend().remove() for a in ax.ravel()[1:]]
 plt.savefig(join(savepath, 'results_N_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
+
+sb.set_style('darkgrid')
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
+plot_results(results, '$T$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$T$', r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+ax[1].semilogy()
+plot_results(results, '$T$', 'reliability test', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
+plt.semilogy()
+[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+[a.get_legend().remove() for a in ax.ravel()[1:]]
+plt.savefig(join(savepath, 'results_T_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
+plot_results(results, '$N$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$N$', r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+ax[1].semilogy()
+plot_results(results, '$N$', 'reliability test', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.01, left=0.2, right=0.95, top=0.95, bottom=0.1)
+plt.semilogy()
+[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+[a.get_legend().remove() for a in ax.ravel()[1:]]
+plt.savefig(join(savepath, 'results_N_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+
+
 def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
     rankmatrix = np.nan *np.zeros((len(df.model.unique()), len(df.model.unique())))
     for i, m in enumerate(df.model.unique()):
         for j, n in enumerate(df.model.unique()):
-            rankmatrix[i, j] = np.sum(df[df.model == m][key].values < df[df.model == n][key].values)
-
+            rankmatrix[i, j] = np.round(np.sum(df[df.model == m][key].values < df[df.model == n][key].values) / df[df.model == m][key].shape[0], 2)
+    print(df[df.model == m][key].shape[0])
     sb.set_style('whitegrid')
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=(4.5, 3))
@@ -212,6 +240,7 @@ def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
     plt.subplots_adjust(bottom=0.25, left=0.25, wspace=0.3, hspace=0.3)
     plt.savefig(join(savepath, '{}_{}_rankplot.pdf'.format(key, strftime("%Y-%m-%d_%H"))))
 
+
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
 rankplot(results, ax=ax[0])
 rankplot(results, key='reliability', ax=ax[1])
@@ -220,6 +249,14 @@ plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
+
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
+rankplot(results, key=r'$d(\xi^{sc, te}, \xi^{tr})$',ax=ax[0])
+rankplot(results, key='reliability test', ax=ax[1])
+rankplot(results, key=r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', ax=ax[2])
+plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
+[a.set_xticklabels([]) for a in ax.ravel()[:-1]]
+plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 # -------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------  obtain animations and final solutions ------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
