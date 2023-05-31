@@ -225,7 +225,7 @@ def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
 rankplot(results, ax=ax[0])
-rankplot(results, key=r'$\sum_t d(\xi^{sc}_t, \xi^{tr}_t)$', ax=ax[1])
+rankplot(results, key=r'$d_d(\xi^{sc}, \xi^{tr})$', ax=ax[1])
 rankplot(results, key=r'$\mathcal{R}$', ax=ax[2])
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
@@ -234,11 +234,14 @@ plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), b
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
 rankplot(results, key=r'$d(\xi^{sc, te}, \xi^{tr})$',ax=ax[0])
-rankplot(results, key=r'$\sum_t d(\xi^{sc, te}_t, \xi^{tr}_t)$', ax=ax[1])
+rankplot(results, key=r'$d_d(\xi^{sc, te}, \xi^{tr})$', ax=ax[1])
 rankplot(results, key=r'$\mathcal{R}_{te}$', ax=ax[2])
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+
+
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------  obtain animations and final solutions ------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -246,7 +249,7 @@ plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H")
 models = {'q-gen': QuantileTree(),
           'scenred': ScenredTree(),
           'ng scenred': NeuralGas(init='scenred', base_tree='scenred',savepath='results/figs/neuralgas/'),
-          'difft-c scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/', loss='combined'),
+          'difft-c scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/'),
           }
 
 _, solutions = parfun((25, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=False)
@@ -254,16 +257,21 @@ _, solutions = parfun((25, 100), processes, models, max_iterations=max_iteration
 sb.set_style('white')
 fig, ax = plt.subplots(3, 4, figsize=(4.5, 4.5))
 
+colors=sb.color_palette('viridis', n_colors=20)
+c1 = colors[16]
+c2 = colors[1]
+
+
 plt.subplots_adjust(wspace=0,hspace=0)
 for pm, a in zip(product(processes.keys(), models.keys()), ax.ravel()):
     p, m = pm
-    models[m].plot_res(*solutions[p][m], ax=a, alpha=0.3, linewidth=0.5)
+    models[m].plot_res(*solutions[p][m], ax=a, alpha=0.3, lwscens=0.7, linewidth=0.8, c1=c1, c2=c2)
 [a.set_yticks([]) for a in ax[:, 1:].ravel()]
 [a.set_xticks([]) for a in ax[:-1, :].ravel()]
 plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 
 
-models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/', loss='combined')}
+models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/')}
 processes = {'double sin': partial(sin_process, double=True),}
 
 _, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True, tol=1e-5)

@@ -26,7 +26,7 @@ class ScenarioTree:
     def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='scenred', logger=None):
         self.nodes_at_step = nodes_at_step
         self.tree = tree
-        self.cm = plt.get_cmap('viridis', 10)
+        self.cm = plt.get_cmap('viridis', 20)
         self.savepath = savepath
         self.init = init
         self.base_tree = base_tree
@@ -151,10 +151,12 @@ class ScenarioTree:
         # plot_graph(tree)
         return tree
 
-    def plot_res(self, tree, scens, ax, loss=None, prob=False, **kwargs):
-        ax.plot(scens, color=self.cm(5), alpha=0.3, linewidth=0.5)
+    def plot_res(self, tree, scens, ax, loss=None, prob=False,c1=None, c2=None, lwscens=0.7, **kwargs):
+        c1 = self.cm(16) if c1 is None else c1
+        c2 = self.cm(1) if c2 is None else c2
+        ax.plot(scens, color=c1, alpha=0.3, linewidth=lwscens)
 
-        plot_from_graph(tree, ax=ax, color=self.cm(2), prob=prob, **kwargs)
+        plot_from_graph(tree, ax=ax, color=c2, prob=prob, **kwargs)
 
 
         ax.set_xlim(0, scens.shape[0] - 1)
