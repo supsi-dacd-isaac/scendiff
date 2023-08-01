@@ -153,7 +153,7 @@ class ScenarioTree:
 
     def plot_res(self, tree, scens, ax, loss=None, prob=False,c1=None, c2=None, lwscens=0.7, **kwargs):
         c1 = self.cm(16) if c1 is None else c1
-        c2 = self.cm(1) if c2 is None else c2
+        c2 = self.cm(2) if c2 is None else c2
         ax.plot(scens, color=c1, alpha=0.3, linewidth=lwscens)
 
         plot_from_graph(tree, ax=ax, color=c2, prob=prob, **kwargs)
@@ -161,6 +161,14 @@ class ScenarioTree:
 
         ax.set_xlim(0, scens.shape[0] - 1)
         ax.set_xlabel(r'$T$')
+
+        # remove all figure spines
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        # remove ticks and ticklabels
+        ax.tick_params(top=False, bottom=False, left=False, right=False, labelleft=False, labelbottom=False)
+
+
         if loss is not None:
             plt.title('{}: {:0.3}'.format(r'$d(\xi^{sc}, \xi^{tr})$', loss))
         return ax
@@ -350,6 +358,7 @@ class DiffTree(ScenarioTree):
         past_loss = 1e-6
         if do_plot:
             fig, ax = plt.subplots(1, 1)
+            plt.subplots_adjust(left=0.01, bottom=0, right=0.99, top=0.94)
         while rel_dev > tol and rel_dev_past>tol and k < k_max:
             if k % evaluation_step == 0:
                 if self.loss == 'scen_dist':
@@ -368,7 +377,7 @@ class DiffTree(ScenarioTree):
                     self.max_lr = np.copy(self.learning_rate)
                     self.learning_rate *= 0.5
                 else:
-                    self.learning_rate = 1.01 * self.learning_rate
+                    self.learning_rate = 1.05 * self.learning_rate
                     self.learning_rate = np.minimum(self.learning_rate, self.max_lr)
                 past_loss = loss
             if do_plot and k % evaluation_step == 0:

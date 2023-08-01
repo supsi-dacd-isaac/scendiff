@@ -274,5 +274,6 @@ plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/')}
 processes = {'double sin': partial(sin_process, double=True),}
 
-_, solutions = parfun((50, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True, tol=1e-5)
+_, solutions = parfun((50, 200), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True, tol=1e-5)
+
 
