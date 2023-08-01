@@ -23,7 +23,8 @@ def get_logger(level=logging.INFO):
 
 
 class ScenarioTree:
-    def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='scenred', logger=None):
+    def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='scenred', logger=None,
+                 probability_assignment_mode='all'):
         self.nodes_at_step = nodes_at_step
         self.tree = tree
         self.cm = plt.get_cmap('viridis', 20)
@@ -32,6 +33,7 @@ class ScenarioTree:
         self.base_tree = base_tree
         self.logger = get_logger() if logger is None else logger
         self.losses = []
+        self.probability_assignment_mode = probability_assignment_mode
 
     @abstractmethod
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=1000, tol=1e-3,
@@ -183,9 +185,17 @@ class ScenarioTree:
         # reset probabilities in tree
         nx.set_node_attributes(tree, 0, name='p')
 
-        for v in terminal_scenarios:
-            winning_leaf = np.argmin(np.abs(leaf_values-v))
-            tree.nodes[leaves[winning_leaf]]['p'] += p
+        if self.probability_assignment_mode == 'leaves':
+            for v in terminal_scenarios:
+                winning_leaf = np.argmin(np.abs(leaf_values-v))
+                tree.nodes[leaves[winning_leaf]]['p'] += p
+        elif self.probability_assignment_mode == 'all':
+            tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(tree)
+            for s in scens.T:
+                winning_branch = np.argmin(np.sum(np.abs(s.reshape(-1, 1)-tree_scens), axis=0))
+                tree.nodes[leaves[winning_branch]]['p'] += p
+        else:
+            raise NotImplementedError(f'probability assignment mode {self.probability_assignment_mode} not implemented')
 
         # assign probabilities to internal nodes by summing up the probabilities of their children
         nodes_prob = {}
