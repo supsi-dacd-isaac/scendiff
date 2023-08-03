@@ -180,6 +180,11 @@ results['$N$'] = results['$T$'].apply(get_nodes)
 results[r'$\frac{V}{N}$'] = results['$N$'] / results['$S$']
 results[r'$\frac{V}{NT}$'] = results['$N$'] / results['$S$']/results['$T$']
 
+# generate normalized results for some keys
+n_keys = [r'$d(\xi^{sc}, \xi^{tr})$', r'$d_d(\xi^{sc}, \xi^{tr})$', r'$d(\xi^{sc, te}, \xi^{tr})$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}$', r'$\mathcal{R}_{te}$']
+for k in n_keys:
+    for m in models:
+        results.loc[results['model'] == m, k[:-1] + '_{norm}$'] = results.loc[results['model'] == m, k] / results.loc[results['model'] == 'scenred', k]
 
 sb.set_style('darkgrid')
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
@@ -191,6 +196,17 @@ plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
 ax[2].semilogx()
 [a.get_legend().remove() for a in ax.ravel()[1:]]
 plt.savefig(join(savepath, 'results_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+
+sb.set_style('darkgrid')
+fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
+plot_results(results, '$S$', r'$d(\xi^{sc}, \xi^{tr})_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[0])
+plot_results(results, '$S$', r'$d_d(\xi^{sc}, \xi^{tr})_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[1])
+plot_results(results, '$N$', r'$\mathcal{R}_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[2])
+plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
+[a.semilogy() for a in ax.ravel()]
+ax[2].semilogx()
+[a.get_legend().remove() for a in ax.ravel()[1:]]
+plt.savefig(join(savepath, 'results_norm_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
