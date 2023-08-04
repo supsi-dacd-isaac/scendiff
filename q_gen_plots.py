@@ -15,10 +15,10 @@ s = 3
 n = 271
 scen = sin_process(steps=s, n_scens=n, double=True)
 
-fig, ax = plt.subplots(1, 1, layout='tight')
+fig, ax = plt.subplots(1, 1, layout='tight', figsize=(4.5, 3.5))
 sb.set_style('white')
 
-plt.plot(scen, color='black', alpha=0.02)
+plt.plot(scen, color='black', alpha=0.1, linewidth=0.2)
 plt.plot(scen, color='black',  marker='.', linestyle='None', markersize=1)
 # remove upper and right spines
 ax.spines[['top', 'right']].set_visible(False)
@@ -62,5 +62,8 @@ for p, label, pos, c in zip(patches, labels, positions, colors):
 # set xticks to the time (integer) values
 ax.set_xticks(times)
 
+tree_color = plt.get_cmap('viridis').colors[2]
 tr = QuantileTree().gen_tree(scen,nodes_at_step=[0, 2, 4])[0]
-plot_from_graph(tr, ax=ax)
+plot_from_graph(tr, ax=ax, color=tree_color, marker='.', markersize=10, alpha=0.7, linewidth=0.6)
+
+plt.savefig('results/quantile_tree.pdf')

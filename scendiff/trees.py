@@ -211,8 +211,38 @@ class ScenarioTree:
         tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
         scen_dist = self.metric_loss(tree_vals, tree_idxs, scens)
         t_dist = self.metric_loss_t(tree_vals, tree_idxs, scens)
-        reliability = self.get_reliability(scens)
-        return scen_dist, t_dist, reliability
+        #reliability = self.get_reliability(scens)
+        trace_reliability = self.get_trace_reliability(scens)
+        return scen_dist, t_dist, trace_reliability
+
+    def get_trace_reliability(self, scens):
+        """
+        For each timestep, re-assign probability to the tree nodes based on optimal distance definition up to time t,
+        compare with stored probabilities
+        :param scens:
+        :return:
+        """
+        tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
+        times = np.arange(scens.shape[0])
+        estimated_p_dict = {n: 0 for n in self.tree.nodes}
+        n_scens = scens.shape[1]
+        for t in times:
+            nodes_at_t = np.unique(tree_idxs[t, :])
+            tree_paths_at_t = np.vstack([tree_vals[nx.shortest_path(self.tree, 0, n)] for n in nodes_at_t])
+            scenarios_at_t = scens[:t+1, :]
+            for s in scenarios_at_t.T:
+                winning_branch = np.argmin(np.sum((s-tree_paths_at_t)**2, axis=1))
+                estimated_p_dict[nodes_at_t[winning_branch]] += 1 / n_scens
+        trace_reliability = np.mean([np.abs(estimated_p_dict[k] - self.tree.nodes('p')[k]) for k in estimated_p_dict.keys()])
+        """
+            plt.gca().cla()
+            plt.plot(estimated_p_dict.values())
+            plt.plot(nx.get_node_attributes(self.tree, 'p').values())
+            plt.title(self.__class__.__name__)
+            plt.pause(0.5)
+        """
+        return trace_reliability
+
 
     def get_reliability(self, scens):
         """
