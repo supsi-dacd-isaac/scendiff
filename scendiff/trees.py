@@ -58,7 +58,9 @@ class ScenarioTree:
                     children = list(tree.successors(j))
                     qs = np.quantile(scens[t + 1, filters[j]], np.linspace(0, 1, len(children) + 1))
                     bins.update({c: [qs[i], qs[i + 1]] for i, c in enumerate(children)})
-                    vals_j = np.quantile(scens[t+1, filters[j]], np.linspace(0, 1, len(children) + 2)[1:-1])
+                    vals_j = np.quantile(scens[t+1, filters[j]], np.linspace(0, 1, len(children)*2 + 1))[1::2]
+                    #vals_j = np.quantile(scens[t + 1, filters[j]], np.linspace(0, 1, len(children) + 2)[1:-1])
+
                     for c, v in zip(children, vals_j):
                         vals[c] = v
                         filters[c] = filters[j][(scens[t + 1, filters[j]] > bins[c][0] - 1e-6) &
