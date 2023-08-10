@@ -7,21 +7,25 @@ from synthetic_processes import sin_process, random_walk
 import matplotlib.pyplot as plt
 import seaborn as sb
 import networkx as nx
+np.random.seed(5)
 
 
-np.random.seed(2)
+colors = sb.color_palette('viridis', n_colors=100)
+c1 = colors[84]
+c2 = colors[4]
+
 alpha = 0.4
 s = 3
-n = 271
+n = 120
 scen = sin_process(steps=s, n_scens=n, double=True)
 
-fig, ax = plt.subplots(1, 1, layout='tight', figsize=(4.5, 3.5))
+fig, ax = plt.subplots(1, 1, layout='tight', figsize=(4.5, 3))
 sb.set_style('white')
 
-plt.plot(scen, color='black', alpha=0.1, linewidth=0.2)
-plt.plot(scen, color='black',  marker='.', linestyle='None', markersize=1)
+plt.plot(scen, color=c1, alpha=0.12, linewidth=0.15)
+plt.plot(scen, color=c1,  marker='.', linestyle='None', markersize=1)
 # remove upper and right spines
-ax.spines[['top', 'right']].set_visible(False)
+ax.spines[['top', 'right', 'left']].set_visible(False)
 
 times = np.arange(s)
 # plot a transprent vertical patch from -05 to 0.5 and from 1.5 to 2.5
@@ -49,7 +53,7 @@ patches.append(ax.fill_betweenx(qs_22[1:], times[2]-0.1, times[2]+0.1, color=col
 # write text in the rigth corner of the patch p1
 labels = np.arange(1, 8)
 positions = [patches[0].get_paths()[0].get_extents().get_points()[1] + np.array([-0.1, 0.1]),
-             patches[1].get_paths()[0].get_extents().get_points()[0] + np.array([+0.05, -0.15]),
+             patches[1].get_paths()[0].get_extents().get_points()[0] + np.array([+0.05, -0.26]),
              patches[2].get_paths()[0].get_extents().get_points()[1] + np.array([-0.15, +0.05]),
              patches[3].get_paths()[0].get_extents().get_points()[0] + np.array([+0.22, +0.3]),
              patches[4].get_paths()[0].get_extents().get_points()[0] + np.array([+0.22, +0.1]),
@@ -59,11 +63,18 @@ positions = [patches[0].get_paths()[0].get_extents().get_points()[1] + np.array(
 for p, label, pos, c in zip(patches, labels, positions, colors):
     ax.text(*pos, '$F_{}$'.format(label), fontsize=20, color=c)
 
+
 # set xticks to the time (integer) values
 ax.set_xticks(times)
+ax.set_yticks([])
 
-tree_color = plt.get_cmap('viridis').colors[2]
+
+
 tr = QuantileTree().gen_tree(scen,nodes_at_step=[0, 2, 4])[0]
-plot_from_graph(tr, ax=ax, color=tree_color, marker='.', markersize=10, alpha=0.7, linewidth=0.6)
+plot_from_graph(tr, ax=ax, color=c2, marker='.', markersize=10, alpha=0.9, linewidth=0.6)
+ax.set_xlabel('time step')
+
+for n in tr.nodes:
+    ax.text(tr.nodes[n]['t']-0.12, tr.nodes[n]['v']+0.1, '$n_{}$'.format(n+1), fontsize=10, color=c2)
 
 plt.savefig('results/quantile_tree.pdf')

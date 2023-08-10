@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from os.path import join
 import networkx as nx
 import logging
-
+from copy import deepcopy
 
 def get_logger(level=logging.INFO):
     logger = logging.getLogger()
@@ -38,7 +38,7 @@ class ScenarioTree:
     @abstractmethod
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=1000, tol=1e-3,
                  nodes_at_step=None):
-        tree = self.gen_init_tree(scens, nodes_at_step) if start_tree is None else start_tree
+        tree = self.gen_init_tree(scens, nodes_at_step) if start_tree is None else deepcopy(start_tree)
         tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(tree)
         return tree, tree_scens, tree_idxs, tree_vals
 
@@ -169,9 +169,9 @@ class ScenarioTree:
         # remove all figure spines
         for spine in ax.spines.values():
             spine.set_visible(False)
+
         # remove ticks and ticklabels
         ax.tick_params(top=False, bottom=False, left=False, right=False, labelleft=False, labelbottom=False)
-
 
         if loss is not None:
             plt.title('{}: {:0.3}'.format(r'$d(\xi^{sc}, \xi^{tr})$', loss))

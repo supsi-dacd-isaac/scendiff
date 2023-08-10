@@ -257,7 +257,6 @@ plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
 
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # ---------------------------  obtain animations and final solutions ------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -270,20 +269,31 @@ models = {'q-gen': QuantileTree(),
 
 _, solutions = parfun((25, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=False)
 
+
 sb.set_style('white')
 fig, ax = plt.subplots(3, 4, figsize=(4.5, 4.5))
-
-colors=sb.color_palette('viridis', n_colors=20)
-c1 = colors[16]
-c2 = colors[1]
-
+colors = sb.color_palette('viridis', n_colors=100)
+c1 = colors[84]
+c2 = colors[4]
 
 plt.subplots_adjust(wspace=0,hspace=0)
 for pm, a in zip(product(processes.keys(), models.keys()), ax.ravel()):
     p, m = pm
-    models[m].plot_res(*solutions[p][m], ax=a, alpha=0.3, lwscens=0.7, linewidth=0.8, c1=c1, c2=c2)
-[a.set_yticks([]) for a in ax[:, 1:].ravel()]
-[a.set_xticks([]) for a in ax[:-1, :].ravel()]
+    a = models[m].plot_res(*solutions[p][m], ax=a, alpha=0.3, lwscens=0.7, linewidth=0.8, c1=c1, c2=c2)
+[a.set_xlabel('time step', size=8) for a in ax[-1, :].ravel()]
+
+for a in ax.ravel():
+    for spine in a.spines.values():
+        spine.set_visible(True)
+
+ax[0, 0].set_ylabel(r'$\xi^{sin}$')
+ax[1, 0].set_ylabel(r'$\xi^{dsin}$')
+ax[2, 0].set_ylabel(r'$\xi^{rw}$')
+ax[0, 0].set_title('q-gen', size=8)
+ax[0, 1].set_title('scenred', size=8)
+ax[0, 2].set_title('ng scenred', size=8)
+ax[0, 3].set_title('difft scenred', size=8)
+
 plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 
 
