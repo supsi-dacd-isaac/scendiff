@@ -62,7 +62,13 @@ def rule_based_xitr(xi, xi_tr):
 
 xi = np.sort(np.hstack([np.random.randn(int(3*n/4)), (np.random.randn(int(n/4))/2+4)])).reshape(-1, 1)
 
-fig, ax = plt.subplots(2, 2, figsize=(8, 5), layout='tight')
+outer = [['a', 'a'],
+         ['b', 'b'],
+        ['c', 'd'],
+        ['c', 'd']]
+
+fig, ax = plt.subplot_mosaic(outer, layout="constrained")
+
 
 xi_tr = np.vstack([-1, 3]).reshape(-1, 1)
 prob, pi, p_tr = kantorovich_xitr(xi, xi_tr, relaxed=True)
@@ -70,13 +76,13 @@ prob.solve()
 distopt, pi_rb, p_tr_rb = rule_based_xitr(xi, xi_tr)
 
 c = [colors[0] if pi.value[0, i] > pi.value[1, i] else colors[1] for i in range(n)]
-[ax[0, 0].vlines(xi_tr.ravel()[i], 0, p_tr.value[i], colors=colors[i], linewidth=2) for i in range(m)]
-sb.kdeplot(xi, alpha=0.5, ax=ax[0, 0])
-sb.rugplot(np.squeeze(xi), alpha=alpha_xi, c=c, height=0.05, linewidth=0.5, ax=ax[0, 0])
+[ax['a'].vlines(xi_tr.ravel()[i], 0, p_tr.value[i], colors=colors[i], linewidth=2) for i in range(m)]
+sb.kdeplot(xi, alpha=0.2, ax=ax['a'])
+sb.rugplot(np.squeeze(xi), alpha=alpha_xi, c=c, height=0.05, linewidth=0.5, ax=ax['a'])
 # put text on the upper left corner with the value of the objective function
-ax[0, 0].text(0.5, 0.9, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax[0, 0].transAxes)
-ax[0, 0].text(0.5, 0.8, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax[0, 0].transAxes)
-ax[0, 0].get_legend().remove()
+ax['a'].text(0.02, 0.85, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax['a'].transAxes)
+ax['a'].text(0.02, 0.65, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax['a'].transAxes)
+ax['a'].get_legend().remove()
 
 xi_tr = np.vstack([0, 4]).reshape(-1, 1)
 prob, pi, p_tr = kantorovich_xitr(xi, xi_tr, relaxed=True)
@@ -85,28 +91,30 @@ distopt, pi_rb, p_tr_rb = rule_based_xitr(xi, xi_tr)
 
 c = [colors[0] if pi.value[0, i] > pi.value[1, i] else colors[1] for i in range(n)]
 
-[ax[1, 0].vlines(xi_tr.ravel()[i], 0, p_tr.value[i]/np.sum(p_tr.value), colors=colors[i], linewidth=2) for i in range(m)]
-sb.kdeplot(xi, alpha=0.5, label='kde', ax=ax[1, 0])
-sb.rugplot(np.squeeze(xi), alpha=alpha_xi, label='xi', c=c, height=0.05, linewidth=0.5, ax=ax[1, 0])
+[ax['b'].vlines(xi_tr.ravel()[i], 0, p_tr.value[i]/np.sum(p_tr.value), colors=colors[i], linewidth=2) for i in range(m)]
+sb.kdeplot(xi, alpha=0.2, label='kde', ax=ax['b'])
+sb.rugplot(np.squeeze(xi), alpha=alpha_xi, label='xi', c=c, height=0.05, linewidth=0.5, ax=ax['b'])
 # put text on the upper left corner with the value of the objective function
-ax[1, 0].text(0.5, 0.9, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax[1, 0].transAxes)
-ax[1, 0].text(0.5, 0.8, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax[1, 0].transAxes)
-ax[1, 0].get_legend().remove()
-ax[0, 0].set_ylim(0, 0.8)
-ax[1, 0].set_ylim(0, 0.8)
+ax['b'].text(0.02, 0.85, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax['b'].transAxes)
+ax['b'].text(0.02, 0.65, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax['b'].transAxes)
+ax['b'].get_legend().remove()
+ax['a'].set_ylim(0, 0.8)
+ax['b'].set_ylim(0, 0.8)
 
 xi = np.vstack([np.random.randn(int(3*n/4), 2), (np.random.randn(int(n/4), 2)/2+4)])
-xi_tr = np.array([[-3, -2], [2, 4]])
+xi_tr = np.array([[-3, -2], [2, 2]])
 prob, pi, p_tr = kantorovich_xitr(xi, xi_tr, relaxed=True)
 prob.solve()
 distopt, pi_rb, p_tr_rb = rule_based_xitr(xi, xi_tr)
 
 c = [colors[0] if pi.value[0, i] > pi.value[1, i] else colors[1] for i in range(n)]
 
-ax[0, 1].scatter(*xi.T, c=c, s=1, alpha=alpha_xi)
-ax[0, 1].scatter(*xi_tr.T, c=colors, s=p_tr.value*150)
-ax[0, 1].text(0.1, 0.9, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax[0, 1].transAxes)
-ax[0, 1].text(0.1, 0.8, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax[0, 1].transAxes)
+ax['c'].scatter(*xi.T, c=c, s=1, alpha=alpha_xi)
+ax['c'].scatter(*xi_tr.T, c=colors, s=p_tr.value*150)
+
+sb.kdeplot(x=xi[:, 0], y=xi[:, 1], ax=ax['c'], alpha=0.2)
+ax['c'].text(0.02, 0.9, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax['c'].transAxes)
+ax['c'].text(0.02, 0.8, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax['c'].transAxes)
 
 xi_tr = np.array([[0, 0], [4, 4]])
 prob, pi, p_tr = kantorovich_xitr(xi, xi_tr, relaxed=True)
@@ -114,12 +122,14 @@ prob.solve()
 distopt, pi_rb, p_tr_rb = rule_based_xitr(xi, xi_tr)
 c = [colors[0] if pi.value[0, i] > pi.value[1, i] else colors[1] for i in range(n)]
 
-ax[1, 1].scatter(*xi.T, c=c, s=1, alpha=alpha_xi)
-ax[1, 1].scatter(*xi_tr.T, c=colors, s=p_tr.value*150)
-ax[1, 1].text(0.1, 0.9, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax[1, 1].transAxes)
-ax[1, 1].text(0.1, 0.8, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax[1, 1].transAxes)
+sb.kdeplot(x=xi[:, 0], y=xi[:, 1], ax=ax['d'], alpha=0.2)
+ax['d'].scatter(*xi.T, c=c, s=1, alpha=alpha_xi)
+ax['d'].scatter(*xi_tr.T, c=colors, s=p_tr.value*150)
+ax['d'].text(0.1, 0.9, r'cvx, $\tilde{d}_K$:' + ' {:.2f}'.format(prob.value), transform=ax['d'].transAxes)
+ax['d'].text(0.1, 0.8, r'rel diff $\tilde{d}_K$:' + ' {:.2e}'.format((prob.value-distopt)/prob.value), transform=ax['d'].transAxes)
 
 # remove spines
-[ax[i, j].spines[['right', 'top']].set_visible(False) for i in range(2) for j in range(2)]
+[a.spines[['right', 'top']].set_visible(False) for a in ax.values()]
 
 plt.savefig('results/relaxed_Kantorovich.pdf')
+

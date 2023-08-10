@@ -31,7 +31,7 @@ def mapper(f, pars, *argv, **kwarg):
 
 
 def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize=(4.5, 3), basepath='results',
-                 textpos=(0.05, 0.6), semilog=False, ax=None):
+                 textpos=(0.05, 0.6), semilog=False, ax=None, legend=True, linewidth=0.8):
 
     x_plots = 1
     if subplot_effect is not None:
@@ -41,19 +41,19 @@ def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize
         sb.set_style('darkgrid')
         fig, ax = plt.subplots(x_plots, 1, figsize=figsize)
         for i, se in enumerate(col_effect_names):
-            sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df[df[subplot_effect] == se], ax=ax[i])
+            sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df[df[subplot_effect] == se], ax=ax[i], legend=legend, linewidth=linewidth)
             ax[i].text(*textpos, '{}={}'.format(subplot_effect, se), transform=ax[i].transAxes, fontsize=9)
-        plt.subplots_adjust(bottom=0.08, left=0.15, right=0.99, hspace=0.02, top=0.98)
     else:
         if ax is None:
             fig, ax = plt.subplots(x_plots, 1, figsize=figsize)
-        sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df, ax=ax)
-        plt.subplots_adjust(bottom=0.2, left=0.15, wspace=0.3, hspace=0.3, top=0.98)
+        sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df, ax=ax, legend=legend, linewidth=linewidth)
 
     if glob(basepath) == []:
         mkdir(basepath)
 
-    [a.legend(fontsize='x-small', ncols=2) for a in np.atleast_1d(ax)]
+    if legend:
+        [a.legend(fontsize='x-small', ncols=2) for a in np.atleast_1d(ax)]
+
     if semilog:
        [a.semilogy() for a in plt.gcf().axes]
     plt.savefig(join(basepath, '{}_{}_{}_{}_{}.pdf'.format(strftime("%Y-%m-%d_%H"), x, y, effect_1, effect_2, subplot_effect)))
@@ -170,7 +170,6 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # -------------------------------------------------------------------------------------------------------------------- #
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
-#results = pd.read_pickle(join(savepath, 'results_{}.pk'.format("2023-05-30_19")))
 get_nodes = lambda t: np.sum(np.linspace(2, t, t).astype(int)-1)
 results.rename({'n_scens': r'$S$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$d_d(\xi^{sc}, \xi^{tr})$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
 results.rename({'scen dist test': r'$d(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$d_d(\xi^{sc, te}, \xi^{tr})$'}, axis=1, inplace=True)
@@ -182,42 +181,52 @@ results[r'$\frac{V}{NT}$'] = results['$N$'] / results['$S$']/results['$T$']
 
 # generate normalized results for some keys
 n_keys = [r'$d(\xi^{sc}, \xi^{tr})$', r'$d_d(\xi^{sc}, \xi^{tr})$', r'$d(\xi^{sc, te}, \xi^{tr})$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}$', r'$\mathcal{R}_{te}$']
-for k in n_keys:
-    for m in models:
-        results.loc[results['model'] == m, k[:-1] + '_{norm}$'] = results.loc[results['model'] == m, k] / results.loc[results['model'] == 'scenred', k]
+n_keys_new = [r'$d_{norm}(\xi^{sc}, \xi^{tr})$', r'$d_{d, norm}(\xi^{sc}, \xi^{tr})$',
+              r'$d_{norm}(\xi^{sc, te}, \xi^{tr})$', r'$d_{d, norm}(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}_{norm}$',
+              r'$\mathcal{R}_{norm, te}$']
+model_keys = models.keys()
+for k, k_new in zip(n_keys, n_keys_new):
+    for m in model_keys:
+        results.loc[results['model'] == m, k_new] = results.loc[results['model'] == m, k].values / results.loc[results['model'] == 'scenred', k].values
 
 sb.set_style('darkgrid')
-fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$S$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$S$', r'$d_d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1])
-ax[1].semilogy()
-plot_results(results, '$N$', r'$\mathcal{R}$', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
-ax[2].semilogx()
-[a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+fig, ax = plt.subplots(3, 2, figsize=(6, 6), layout='compressed')
+plot_results(results, '$S$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 0])
+plot_results(results, '$S$', r'$d_d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 0], legend=False)
+ax[1, 0].semilogy()
+plot_results(results, '$N$', r'$\mathcal{R}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 0], legend=False)
+ax[2, 0].semilogx()
 
-sb.set_style('darkgrid')
-fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$S$', r'$d(\xi^{sc}, \xi^{tr})_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$S$', r'$d_d(\xi^{sc}, \xi^{tr})_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[1])
-plot_results(results, '$N$', r'$\mathcal{R}_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
-[a.semilogy() for a in ax.ravel()]
-ax[2].semilogx()
-[a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_norm_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+results.loc[results['model'] == 'scenred', 'model'] = 'scenred (ref.)'
+plot_results(results, '$S$', r'$d_{norm}(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 1])
+plot_results(results, '$S$', r'$d_{d, norm}(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 1], legend=False)
+plot_results(results, '$N$', r'$\mathcal{R}_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 1], legend=False)
+[a.semilogy() for a in ax[:, 1].ravel()]
+ax[2, 1].semilogx()
+ax[0, 0].set_title('scores')
+ax[0, 1].set_title('normalized scores')
+
+plt.savefig(join(savepath, 'results_combo_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
 
-fig, ax = plt.subplots(3, 1, figsize=(4.5, 6))
-plot_results(results, '$S$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0])
-plot_results(results, '$S$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1])
-ax[1].semilogy()
-plot_results(results, '$N$', r'$\mathcal{R}_{te}$', 'model', figsize=(4.5, 2.5), ax=ax[2])
-plt.subplots_adjust(hspace=0.3, left=0.2, right=0.95, top=0.95, bottom=0.1)
-ax[2].semilogx()
-[a.get_legend().remove() for a in ax.ravel()[1:]]
-plt.savefig(join(savepath, 'results_test{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
+fig, ax = plt.subplots(3, 2, figsize=(6, 6), layout='compressed')
+results.loc[results['model'] == 'scenred (ref.)', 'model'] = 'scenred'
+plot_results(results, '$S$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 0])
+plot_results(results, '$S$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 0], legend=False)
+ax[1, 0].semilogy()
+plot_results(results, '$N$', r'$\mathcal{R}_{te}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 0], legend=False)
+ax[2, 0].semilogx()
+
+results.loc[results['model'] == 'scenred', 'model'] = 'scenred (ref.)'
+plot_results(results, '$S$', r'$d_{norm}(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 1])
+plot_results(results, '$S$', r'$d_{d, norm}(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 1], legend=False)
+plot_results(results, '$N$', r'$\mathcal{R}_{norm, te}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 1], legend=False)
+[a.semilogy() for a in ax[:, 1].ravel()]
+ax[2, 1].semilogx()
+ax[0, 0].set_title('scores')
+ax[0, 1].set_title('normalized scores')
+
+plt.savefig(join(savepath, 'results_combo_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
 
 plot_results(results, '$T$', 't [s]', 'model', figsize=(4.5, 2.5))
