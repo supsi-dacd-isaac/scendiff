@@ -171,8 +171,8 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
 get_nodes = lambda t: np.sum(np.linspace(2, t, t).astype(int)-1)
-results.rename({'n_scens': r'$S$', 'scen dist': r'$d(\xi^{sc}, \xi^{tr})$', 't dist': r'$d_d(\xi^{sc}, \xi^{tr})$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
-results.rename({'scen dist test': r'$d(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$d_d(\xi^{sc, te}, \xi^{tr})$'}, axis=1, inplace=True)
+results.rename({'n_scens': r'$S$', 'scen dist': r'$\tilde{d}(\xi^{sc}, \xi^{tr})$', 't dist': r'$d_d(\xi^{sc}, \xi^{tr})$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
+results.rename({'scen dist test': r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$d_d(\xi^{sc, te}, \xi^{tr})$'}, axis=1, inplace=True)
 results.rename({'reliability': r'$\mathcal{R}$', 'reliability test': r'$\mathcal{R}_{te}$'}, axis=1, inplace=True)
 
 results['$N$'] = results['$T$'].apply(get_nodes)
@@ -180,9 +180,9 @@ results[r'$\frac{V}{N}$'] = results['$N$'] / results['$S$']
 results[r'$\frac{V}{NT}$'] = results['$N$'] / results['$S$']/results['$T$']
 
 # generate normalized results for some keys
-n_keys = [r'$d(\xi^{sc}, \xi^{tr})$', r'$d_d(\xi^{sc}, \xi^{tr})$', r'$d(\xi^{sc, te}, \xi^{tr})$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}$', r'$\mathcal{R}_{te}$']
-n_keys_new = [r'$d_{norm}(\xi^{sc}, \xi^{tr})$', r'$d_{d, norm}(\xi^{sc}, \xi^{tr})$',
-              r'$d_{norm}(\xi^{sc, te}, \xi^{tr})$', r'$d_{d, norm}(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}_{norm}$',
+n_keys = [r'$\tilde{d}(\xi^{sc}, \xi^{tr})$', r'$d_d(\xi^{sc}, \xi^{tr})$', r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}$', r'$\mathcal{R}_{te}$']
+n_keys_new = [r'$\tilde{d}_{norm}(\xi^{sc}, \xi^{tr})$', r'$d_{d, norm}(\xi^{sc}, \xi^{tr})$',
+              r'$\tilde{d}_{norm}(\xi^{sc, te}, \xi^{tr})$', r'$d_{d, norm}(\xi^{sc, te}, \xi^{tr})$', r'$\mathcal{R}_{norm}$',
               r'$\mathcal{R}_{norm, te}$']
 model_keys = models.keys()
 for k, k_new in zip(n_keys, n_keys_new):
@@ -191,14 +191,14 @@ for k, k_new in zip(n_keys, n_keys_new):
 
 sb.set_style('darkgrid')
 fig, ax = plt.subplots(3, 2, figsize=(6, 6), layout='compressed')
-plot_results(results, '$S$', r'$d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 0])
+plot_results(results, '$S$', r'$\tilde{d}(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 0])
 plot_results(results, '$S$', r'$d_d(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 0], legend=False)
 ax[1, 0].semilogy()
 plot_results(results, '$N$', r'$\mathcal{R}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 0], legend=False)
 ax[2, 0].semilogx()
 
 results.loc[results['model'] == 'scenred', 'model'] = 'scenred (ref.)'
-plot_results(results, '$S$', r'$d_{norm}(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 1])
+plot_results(results, '$S$', r'$\tilde{d}_{norm}(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 1])
 plot_results(results, '$S$', r'$d_{d, norm}(\xi^{sc}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 1], legend=False)
 plot_results(results, '$N$', r'$\mathcal{R}_{norm}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 1], legend=False)
 [a.semilogy() for a in ax[:, 1].ravel()]
@@ -211,14 +211,14 @@ plt.savefig(join(savepath, 'results_combo_{}.pdf'.format(strftime("%Y-%m-%d_%H")
 
 fig, ax = plt.subplots(3, 2, figsize=(6, 6), layout='compressed')
 results.loc[results['model'] == 'scenred (ref.)', 'model'] = 'scenred'
-plot_results(results, '$S$', r'$d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 0])
+plot_results(results, '$S$', r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 0])
 plot_results(results, '$S$', r'$d_d(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 0], legend=False)
 ax[1, 0].semilogy()
 plot_results(results, '$N$', r'$\mathcal{R}_{te}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 0], legend=False)
 ax[2, 0].semilogx()
 
 results.loc[results['model'] == 'scenred', 'model'] = 'scenred (ref.)'
-plot_results(results, '$S$', r'$d_{norm}(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 1])
+plot_results(results, '$S$', r'$\tilde{d}_{norm}(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[0, 1])
 plot_results(results, '$S$', r'$d_{d, norm}(\xi^{sc, te}, \xi^{tr})$', 'model', figsize=(4.5, 2.5), ax=ax[1, 1], legend=False)
 plot_results(results, '$N$', r'$\mathcal{R}_{norm, te}$', 'model', figsize=(4.5, 2.5), ax=ax[2, 1], legend=False)
 [a.semilogy() for a in ax[:, 1].ravel()]
@@ -231,7 +231,7 @@ plt.savefig(join(savepath, 'results_combo_test_{}.pdf'.format(strftime("%Y-%m-%d
 
 plot_results(results, '$T$', 't [s]', 'model', figsize=(4.5, 2.5))
 
-def rankplot(df, key=r'$d(\xi^{sc}, \xi^{tr})$', ax=None):
+def rankplot(df, key=r'$\tilde{d}(\xi^{sc}, \xi^{tr})$', ax=None):
     rankmatrix = np.nan *np.zeros((len(df.model.unique()), len(df.model.unique())))
     for i, m in enumerate(df.model.unique()):
         for j, n in enumerate(df.model.unique()):
@@ -258,7 +258,7 @@ plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), b
 
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
-rankplot(results, key=r'$d(\xi^{sc, te}, \xi^{tr})$',ax=ax[0])
+rankplot(results, key=r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$',ax=ax[0])
 rankplot(results, key=r'$d_d(\xi^{sc, te}, \xi^{tr})$', ax=ax[1])
 rankplot(results, key=r'$\mathcal{R}_{te}$', ax=ax[2])
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)

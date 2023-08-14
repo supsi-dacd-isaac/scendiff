@@ -194,7 +194,7 @@ class ScenarioTree:
         elif self.probability_assignment_mode == 'all':
             tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(tree)
             for s in scens.T:
-                winning_branch = np.argmin(np.sum(np.abs(s.reshape(-1, 1)-tree_scens), axis=0))
+                winning_branch = np.argmin(np.sum((s.reshape(-1, 1)-tree_scens)**2, axis=0))
                 tree.nodes[leaves[winning_branch]]['p'] += p
         else:
             raise NotImplementedError(f'probability assignment mode {self.probability_assignment_mode} not implemented')
