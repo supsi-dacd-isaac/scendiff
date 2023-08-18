@@ -7,8 +7,8 @@ from synthetic_processes import sin_process
 
 class TestScenarios(unittest.TestCase):
     def setUp(self) -> None:
-        self.ng = NeuralGas(init='scenred', base_tree='scenred')
-        self.ndt = DiffTree(init='scenred', base_tree='scenred')
+        self.ng = NeuralGas(init_vals_method='scenred', init_tree_method='scenred')
+        self.ndt = DiffTree(init_vals_method='scenred', init_tree_method='scenred')
         self.srt = ScenredTree()
         self.qt = QuantileTree()
         self.test_scens = sin_process(24, 20, double=True)
@@ -22,11 +22,11 @@ class TestScenarios(unittest.TestCase):
 
         plot_from_graph(tree_ng)
         plot_from_graph(tree_d, ax=plt.gca(), color='r')
-        plt.show()
+        plt.pause(0.1)
 
         plot_from_graph(tree_sr, ax=plt.gca(), linestyle='--')
         plot_from_graph(tree_q)
-        plt.show()
+        plt.pause(0.1)
 
 
 if __name__ == '__main__':

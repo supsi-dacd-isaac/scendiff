@@ -7,21 +7,25 @@ from synthetic_processes import sin_process, random_walk
 import matplotlib.pyplot as plt
 import seaborn as sb
 import networkx as nx
+
+# ----------------------------------------------------------------------------------------------------------------------
+# ------------------------------------ Define parameters ---------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 np.random.seed(5)
-
-
 colors = sb.color_palette('viridis', n_colors=100)
 c1 = colors[84]
 c2 = colors[4]
-
 alpha = 0.4
-s = 3
-n = 120
-scen = sin_process(steps=s, n_scens=n, double=True)
+s = 3               # number of steps
+n = 120             # number of scenarios
+scen = sin_process(steps=s, n_scens=n, double=True) # generate scenarios
 
+
+# ----------------------------------------------------------------------------------------------------------------------
+# ------------------------------------ Plot scenarios and bins ---------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 fig, ax = plt.subplots(1, 1, layout='tight', figsize=(4.5, 3))
 sb.set_style('white')
-
 plt.plot(scen, color=c1, alpha=0.12, linewidth=0.15)
 plt.plot(scen, color=c1,  marker='.', linestyle='None', markersize=1)
 # remove upper and right spines
@@ -68,8 +72,9 @@ for p, label, pos, c in zip(patches, labels, positions, colors):
 ax.set_xticks(times)
 ax.set_yticks([])
 
-
-
+# ----------------------------------------------------------------------------------------------------------------------
+# ------------------------------------ Plot q-gen tree -----------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 tr = QuantileTree().gen_tree(scen,nodes_at_step=[0, 2, 4])[0]
 plot_from_graph(tr, ax=ax, color=c2, marker='.', markersize=10, alpha=0.9, linewidth=0.6)
 ax.set_xlabel('time step')

@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from jax import numpy as jnp
 from jax import lax, jit, vmap, grad
-import jax.ops as jops
 from functools import partial
 from typing import Tuple, Union
 from scendiff.tree_utils import retrieve_scenarios_indexes, replace_var, get_scenarios_from_tree
@@ -15,39 +14,69 @@ import networkx as nx
 import logging
 from copy import deepcopy
 
-def get_logger(level=logging.INFO):
-    logger = logging.getLogger()
+
+def get_logger(name='scenario_tree', level=logging.WARNING):
+    logger = logging.getLogger(name)
     logging.basicConfig(format='%(asctime)-15s::%(levelname)s::%(funcName)s::%(message)s')
     logger.setLevel(level)
     return logger
 
 
 class ScenarioTree:
-    def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='scenred', logger=None,
-                 probability_assignment_mode='all'):
+    """
+    Base class for scenario tree generation
+    nodes_at_step: vector of length T containing the (increasingly monotone) number of nodes at each time step
+    savepath: str location where to save training plots
+    init_vals_method: str, method to initialize the values of the tree. 'zero', 'quantiles' or 'scenred'
+    init_tree_method: str, method to initialize the tree structure. 'scenred' or 'quantiles'
+    logger: logging.Logger
+    probability_assignment_mode: str. 'all' or 'leaves'. If 'all', the probability of the leaves is assigned considering
+                                 the closest neighbor in terms of scenarios (as in the paper). If 'leaves', the
+                                 probability of the leaves is assigned considering the closest neighbors in the last
+                                 time step.
+    """
+    def __init__(self, nodes_at_step=None, savepath=None, init_vals_method='quantiles', init_tree_method='scenred',
+                 logger=None, probability_assignment_mode='all'):
         self.nodes_at_step = nodes_at_step
-        self.tree = tree
         self.cm = plt.get_cmap('viridis', 20)
         self.savepath = savepath
-        self.init = init
-        self.base_tree = base_tree
-        self.logger = get_logger() if logger is None else logger
+        self.init_vals_method = init_vals_method
+        self.init_tree_method = init_tree_method
+        self.logger = get_logger(self.__class__.__name__) if logger is None else logger
         self.losses = []
         self.probability_assignment_mode = probability_assignment_mode
+        self.tree = None
 
     @abstractmethod
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=1000, tol=1e-3,
                  nodes_at_step=None):
+        """
+        Generate a scenario tree from a set of scenarios
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :param start_tree: if not None, the tree structure is initialized with this tree
+        :param k_max: maximum number of iterations for the tree generation
+        :param tol: tolerance for the stopping condition of the tree generation process
+        :param nodes_at_step: number of nodes at each time step. If None, it is inferred from the number of scenarios
+        :return:
+        """
         tree = self.gen_init_tree(scens, nodes_at_step) if start_tree is None else deepcopy(start_tree)
         tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(tree)
         return tree, tree_scens, tree_idxs, tree_vals
 
     def init_vals(self, tree, tree_scens, tree_vals, scens):
-        if self.init == 'zero':
+        """
+        Initialize the values of the tree
+        :param tree: networkx.DiGraph representing the tree structure
+        :param tree_scens: np.ndarray of shape (T, M) containing the scenarios in the tree
+        :param tree_vals: np.ndarray of shape (N) containing the values of the scenarios in the tree
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :return:
+        """
+        if self.init_vals_method == 'zero':
             tree_scens *= 0
             tree_vals *= 0
             replace_var(tree, tree_vals)
-        elif self.init == 'quantiles':
+        elif self.init_vals_method == 'quantiles':
             bins = {0: np.quantile(scens[0, :], [0, 1])}
             vals = {0: np.median(scens[0, :])}
             filters = {0: np.arange(scens.shape[1])}
@@ -73,8 +102,8 @@ class ScenarioTree:
             nx.set_node_attributes(tree, vals, name='v')
             tree_vals = np.hstack(list(dict(tree.nodes('v')).values()))
             tree_scens = np.vstack([tree_vals[idx] for idx in tree_idxs])
-        elif self.init == 'scenred':
-            if self.base_tree == 'scenred':
+        elif self.init_vals_method == 'scenred':
+            if self.init_tree_method == 'scenred':
                 pass
             else:
                 _, _, _, _, tree = scenred(scens, nodes=self.nodes_at_step)
@@ -82,11 +111,18 @@ class ScenarioTree:
                 tree_vals = np.hstack(list(dict(tree.nodes('v')).values()))
                 tree_scens = np.vstack([tree_vals[idx] for idx in tree_idxs])
         else:
-            raise NotImplementedError(f'init method {self.init} not implemented')
+            raise NotImplementedError(f'init method {self.init_vals_method} not implemented')
 
         return tree, tree_scens, tree_vals
 
     def gen_init_tree(self, scens, nodes_at_step=None):
+        """
+        Generate an initial tree structure
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :param nodes_at_step: vector of length T containing the (increasingly monotone) number of nodes at each time
+                              step. If None, and self.nodes_at_step is None, it is inferred from the number of scenarios
+        :return:
+        """
         if nodes_at_step is None:
             geometric_steps = np.array([2 ** t for t in range(int(np.floor(np.log2(scens.shape[1]))))][1:])
             geometric_progression = np.floor(
@@ -106,9 +142,9 @@ class ScenarioTree:
         if nodes_at_step[0] != 1:
             nodes_at_step[0] = 1
             self.logger.info('your initial nodes_at_step was not 1, forcing it to be')
-        if self.base_tree == 'scenred':
+        if self.init_tree_method == 'scenred':
             _, _, _, _, tree = scenred(scens, nodes=nodes_at_step)
-        elif self.base_tree == 'quantiles':
+        elif self.init_tree_method == 'quantiles':
             # build valueless tree
             tree = nx.DiGraph()
             tree.add_node(0, t=0, p=1, v=np.atleast_1d(0))
@@ -131,31 +167,34 @@ class ScenarioTree:
                     parents_ps = {k: v for k, v in nx.get_node_attributes(tree, 'p').items() if k in names_of_nodes_at_previous_step}
                     parents_sorted_by_p = np.array(list(dict(sorted(parents_ps.items(), key=lambda item: item[1],reverse=True)).keys()))
                     lucky_parents = parents_sorted_by_p[:additionals]
-                    #lucky_parents = np.random.choice(names_of_nodes_at_previous_step, additionals, replace=False)
                     for p in lucky_parents:
                         children_p = tree.nodes[p]['p'] / (child_per_par + 1)
                         nx.set_node_attributes(tree, {c: children_p for c in nx.descendants(tree, p)}, name='p')
                         names_of_nodes_at_t.append(k)
                         tree.add_node(k, t=t, p=children_p, v=np.atleast_1d(0))
                         tree.add_edge(p, k)
-
                         k += 1
 
                 names_of_nodes_at_previous_step = np.copy(names_of_nodes_at_t)
-
-            leaves = [n for n, time in nx.get_node_attributes(tree, 't').items() if time == len(nodes_at_step) - 1]
-            leaves_prob = {l: 1 / len(leaves) for l in leaves}
-            nx.set_node_attributes(tree, leaves_prob, name='p')
-            nodes_prob = {}
-            for n in list(set(tree.nodes) - set(leaves)):
-                nodes_prob[n] = len([i for i in nx.descendants(tree, n) if i in leaves]) / len(leaves)
-            nx.set_node_attributes(tree, nodes_prob, name='p')
         else:
-            raise NotImplementedError(f'base tree {self.base_tree} not implemented')
+            raise NotImplementedError(f'base tree {self.init_tree_method} not implemented')
         # plot_graph(tree)
         return tree
 
     def plot_res(self, tree, scens, ax, loss=None, prob=False,c1=None, c2=None, lwscens=0.7, **kwargs):
+        """
+        plot the tree and the scenarios
+        :param tree: nx.DiGraph object representing the tree
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :param ax: axis to plot on
+        :param loss: loss function value to plot
+        :param prob: probability to plot
+        :param c1: color of the scenarios
+        :param c2: color of the tree
+        :param lwscens: linewidth of the scenarios
+        :param kwargs:
+        :return:
+        """
         c1 = self.cm(16) if c1 is None else c1
         c2 = self.cm(2) if c2 is None else c2
         ax.plot(scens, color=c1, alpha=0.3, linewidth=lwscens)
@@ -178,6 +217,16 @@ class ScenarioTree:
         return ax
 
     def assign_probabilities(self, tree, scens):
+        """
+        assign probabilities to the tree. This is done by assigning probabilities to the leaves and then propagating
+        them up the tree.  If self.probability_assignment_mode is  'all', the probability of the leaves is assigned
+        considering the closest neighbor in terms of scenarios (as in the paper). If 'leaves', the probability of the
+        leaves is assigned considering the closest neighbors in the last time step.
+
+        :param tree: nx.DiGraph object representing the tree
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :return:
+        """
         # assign probabilities to leaves
         leaves = [k for k, v in nx.get_node_attributes(tree, 't').items() if v == np.max(list(nx.get_node_attributes(tree, 't').values()))]
         leaf_values = np.array([v for k, v in nx.get_node_attributes(tree, 'v').items() if k in leaves])
@@ -208,19 +257,25 @@ class ScenarioTree:
         return tree
 
     def evaluate_tree(self, scens):
+        """
+        evaluate the tree by computing the relaxed Kantorovich distance between the scenarios and the tree, the sum of
+        discrepancies between the marginal probability distributions of the tree and the scenarios, at each timestep,
+        and the reliability of the tree.
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :return:
+        """
         tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
         scen_dist = self.metric_loss(tree_vals, tree_idxs, scens)
         t_dist = self.metric_loss_t(tree_vals, tree_idxs, scens)
-        #reliability = self.get_reliability(scens)
         trace_reliability = self.get_trace_reliability(scens)
         return scen_dist, t_dist, trace_reliability
 
     def get_trace_reliability(self, scens):
         """
         For each timestep, re-assign probability to the tree nodes based on optimal distance definition up to time t,
-        compare with stored probabilities
-        :param scens:
-        :return:
+        and compare with stored probabilities.
+        :param scens: np.ndarray of shape (T, S), representing scenarios drawn from P
+        :return: trace reliability
         """
         tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
         times = np.arange(scens.shape[0])
@@ -234,44 +289,7 @@ class ScenarioTree:
                 winning_branch = np.argmin(np.sum((s-tree_paths_at_t)**2, axis=1))
                 estimated_p_dict[nodes_at_t[winning_branch]] += 1 / n_scens
         trace_reliability = np.mean([np.abs(estimated_p_dict[k] - self.tree.nodes('p')[k]) for k in estimated_p_dict.keys()])
-        """
-            plt.gca().cla()
-            plt.plot(estimated_p_dict.values())
-            plt.plot(nx.get_node_attributes(self.tree, 'p').values())
-            plt.title(self.__class__.__name__)
-            plt.pause(0.5)
-        """
         return trace_reliability
-
-
-    def get_reliability(self, scens):
-        """
-        For each timestep, re-assign probability to the tree nodes based on distance, compare with stored probabilities
-        :return:
-        """
-        tree_scens, tree_vals, tree_idxs = get_scenarios_from_tree(self.tree)
-        times = np.arange(scens.shape[0])
-        p_dict = nx.get_node_attributes(self.tree, 'p').copy()
-        estimated_p_dict = {k: 0 for k in p_dict.keys()}
-        v_dict = nx.get_node_attributes(self.tree, 'v').copy()
-        p = 1 / scens.shape[1]
-        for t in times:
-            nodes_at_t = np.unique(tree_idxs[t, :])
-            values_at_t = scens[t, :]
-            tree_vals_at_t = np.hstack([v for k, v in v_dict.items() if k in nodes_at_t])
-            for v in values_at_t:
-                winning_leaf = np.argmin(np.abs(tree_vals_at_t - v))
-                estimated_p_dict[nodes_at_t[winning_leaf]]+= p
-
-        """
-        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-        self.plot_res(self.tree, scens, ax[0], prob=True)
-        nx.set_node_attributes(self.tree, estimated_p_dict, name='p')
-        self.plot_res(self.tree, scens, ax[1], prob=True)
-        """
-
-        reliability = np.mean([np.abs(estimated_p_dict[k] - p_dict[k]) for k in p_dict.keys()])
-        return reliability
 
     @staticmethod
     @jit
@@ -307,12 +325,21 @@ class ScenarioTree:
 
 
 class NeuralGas(ScenarioTree):
-    def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='quantiles'):
+    """
+    Neural Gas algorithm for scenario tree generation, implemented following [1].
+    savepath: str location where to save training plots
+    init_vals_method: str, method to initialize the values of the tree. 'zero', 'quantiles' or 'scenred'
+    init_tree_method: str, method to initialize the tree structure. 'scenred' or 'quantiles'
+
+    [1] Latorre, J. M., Cerisola, S., and Ramos, A. Clustering algorithms for scenario tree generation: Application to
+    natural hydro inflows. European Journal of Operational Research, 181(3):1339–1353, September 2007
+    """
+    def __init__(self, nodes_at_step=None, savepath=None, init_vals_method='quantiles', init_tree_method='quantiles'):
         self.pars = {'lambda_0': 1,
                      'lambda_f': 0.05,
                      'e0': 5,
                      'ef': 0.05}
-        super().__init__(tree, nodes_at_step, savepath, init, base_tree)
+        super().__init__(nodes_at_step, savepath, init_vals_method, init_tree_method)
 
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=10000, tol=1e-3,
                  do_plot=True, nodes_at_step=None, **kwargs):
@@ -324,12 +351,10 @@ class NeuralGas(ScenarioTree):
         if do_plot:
             fig, ax = plt.subplots(1, 1)
         while rel_dev > tol and k < k_max:
-            if k % 1 == 0:
-                tree_vals = update_tree_from_scenarios(tree, tree_idxs, tree_scens)
-                loss = self.metric_loss(jnp.array(tree_vals).ravel(), jnp.array(tree_idxs), jnp.array(scens))
-                self.losses.append(loss)
-                #print('iter {}, loss: {}'.format(k, loss))
-            if do_plot and k % 1 == 0:
+            tree_vals = update_tree_from_scenarios(tree, tree_idxs, tree_scens)
+            loss = self.metric_loss(jnp.array(tree_vals).ravel(), jnp.array(tree_idxs), jnp.array(scens))
+            self.losses.append(loss)
+            if do_plot:
                 ax.cla()
                 update_tree_from_scenarios(tree, tree_idxs, tree_scens)
                 self.plot_res(tree, scens, ax, loss)
@@ -368,8 +393,6 @@ def update_tree_from_scenarios(tree, tree_idxs, tree_scens):
     for i in range(len(tree.nodes)):
         var_pos = np.atleast_2d(np.argwhere(tree_idxs == i))
         var = np.unique([tree_scens[p[0], p[1]] for p in var_pos])
-        if len(var) != 1:
-            print('asda')
         assert len(var) == 1, 'smth wrong, var should contain just one obs (all obs in tree_scens at var_pos ' \
                               'should be equal by construction)'
         tree_vals.append(var.ravel())
@@ -378,9 +401,20 @@ def update_tree_from_scenarios(tree, tree_idxs, tree_scens):
 
 
 class DiffTree(ScenarioTree):
-    def __init__(self, tree=None, nodes_at_step=None, savepath=None, init='quantiles', base_tree='scenred',
+    """
+    Differentiable tree algorithm for scenario tree generation, presented in [1].
+    savepath: str location where to save training plots
+    init_vals_method: str, method to initialize the values of the tree. 'zero', 'quantiles' or 'scenred'
+    init_tree_method: str, method to initialize the tree structure. 'scenred' or 'quantiles'
+    learning_rate: float, learning rate for the gradient descent
+    loss: str, loss function to use. 'scen_dist' or 'combined'. If scen_dist, the relxed Kantorovich distance is
+          minimized. If combined, the relaxed Kantorovich distance is minimized together with the distance between
+          the tree and scenarios marginal distributions at each timestep
+    [1] Scenario Tree Generation via Adaptive Gradient Descent, preprint, 2023
+    """
+    def __init__(self, nodes_at_step=None, savepath=None, init_vals_method='quantiles', init_tree_method='scenred',
                  learning_rate=None, loss='scen_dist'):
-        super().__init__(tree, nodes_at_step, savepath, init, base_tree)
+        super().__init__(nodes_at_step, savepath, init_vals_method, init_tree_method)
         self.learning_rate = learning_rate
         self.max_lr = np.copy(self.learning_rate)
         self.loss = loss
@@ -411,9 +445,8 @@ class DiffTree(ScenarioTree):
                 self.losses.append(loss)
                 rel_dev_past = rel_dev
                 rel_dev = np.abs(loss - past_loss) / past_loss
-                #print('iter {}, loss: {}, rel_dev: {:0.2e}'.format(k, loss, rel_dev)
                 if loss > past_loss and k > 0:
-                    print('I am setting learning rate from {} to {} since loss increased last step'.format(
+                    self.logger.info('I am setting learning rate from {} to {} since loss increased last step'.format(
                         self.learning_rate, self.learning_rate * 0.5))
                     tree_vals += g * self.learning_rate / ps
                     self.max_lr = np.copy(self.learning_rate)
@@ -436,7 +469,6 @@ class DiffTree(ScenarioTree):
                 tree_scens = jnp.vstack([tree_vals[i] for i in tree_idxs.T]).T
                 g = grad(partial(self.metric_loss, tree_idxs=tree_idxs, scens=scens))(tree_vals)
                 g += grad(partial(self.metric_loss_t, tree_idxs=tree_idxs, scens=scens))(tree_vals)
-            #g = jnp.sign(g)*jnp.minimum(jnp.abs(g), jnp.quantile(jnp.abs(g), 0.99))
             tree_vals -= g * self.learning_rate / ps
             k += 1
 
@@ -447,8 +479,16 @@ class DiffTree(ScenarioTree):
 
 
 class ScenredTree(ScenarioTree):
-    def __init__(self, tree=None, nodes_at_step=None, savepath=None):
-        super().__init__(tree, nodes_at_step, savepath, 'quantiles', 'scenred')
+    """
+    Scenario reduction tree algorithm for scenario tree generation, presented in [1].
+    nodes_at_step: list, number of nodes at each step of the tree
+    savepath: str location where to save training plots
+
+    [1] Growe-Kuska, N., Heitsch, H., and Romisch, W. Scenario reduction and scenario tree construction for power
+    management problems. In 2003 IEEE Bologna Power Tech Conference Proceedings,, volume 3, pp. 7 pp. Vol.3–,June 2003
+    """
+    def __init__(self, nodes_at_step=None, savepath=None):
+        super().__init__(nodes_at_step, savepath, 'scenred', 'scenred')
 
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=1000, tol=1e-3,
                  nodes_at_step=None, **kwargs):
@@ -462,8 +502,14 @@ class ScenredTree(ScenarioTree):
 
 
 class QuantileTree(ScenarioTree):
-    def __init__(self, tree=None, nodes_at_step=None, savepath=None):
-        super().__init__(tree, nodes_at_step, savepath, 'quantiles', 'quantiles')
+    """
+    Quantile tree algorithm for scenario tree generation, presented in [1].
+    nodes_at_step: list, number of nodes at each step of the tree
+    savepath: str location where to save training plots
+    [1] Scenario Tree Generation via Adaptive Gradient Descent, preprint, 2023
+    """
+    def __init__(self, nodes_at_step=None, savepath=None):
+        super().__init__(nodes_at_step, savepath, 'quantiles', 'quantiles')
 
     def gen_tree(self, scens: Union[list, np.ndarray, pd.DataFrame], start_tree=None, k_max=1000, tol=1e-3,
                  nodes_at_step=None, **kwargs):
@@ -475,17 +521,5 @@ class QuantileTree(ScenarioTree):
         tree = self.assign_probabilities(tree, scens)
         self.tree = tree
         return tree, tree_scens, tree_idxs, tree_vals
-
-
-@jit
-def metric_loss(tree_vals, tree_idxs, scens):
-    tot_dist = jnp.array(0)
-    tree_scens = jnp.vstack([tree_vals[i] for i in tree_idxs.T]).T
-    for scen in scens.T:
-        dists = ScenarioTree.compute_distances(tree_scens, scen)
-        expdists = jnp.exp(80 / (1 + dists))
-        softmax = expdists / jnp.sum(expdists)
-        tot_dist += jnp.sum(softmax * dists)
-    return tot_dist
 
 

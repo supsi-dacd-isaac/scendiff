@@ -2,7 +2,7 @@ import multiprocessing
 import pandas as pd
 import numpy as np
 from scendiff.trees import NeuralGas, DiffTree, ScenredTree, QuantileTree
-from scendiff.plot_utils import plot_from_graph
+from scendiff.plot_utils import plot_results, rankplot
 from synthetic_processes import sin_process, random_walk
 from time import time, strftime
 import seaborn as sb
@@ -14,12 +14,19 @@ from multiprocessing import Pool, cpu_count
 from itertools import product
 from functools import partial
 
+# ---------------------------------------------------------------------------------------------------------------------
+# ------------------------------------ Set parameters -----------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
+
 np.random.seed(10)
 semaphore = multiprocessing.Semaphore(int(cpu_count()))
-savepath = 'results/combined'
+savepath = 'results'
 use_parallel = True
+max_iterations = 300
+par_steps = 11
 
 
+# parallelization function
 def mapper(f, pars, *argv, **kwarg):
     poolsize = cpu_count() - 1
     pool = Pool(poolsize)
@@ -29,45 +36,16 @@ def mapper(f, pars, *argv, **kwarg):
     pool.join()
     return a
 
-
-def plot_results(df, x, y, effect_1, effect_2=None, subplot_effect=None, figsize=(4.5, 3), basepath='results',
-                 textpos=(0.05, 0.6), semilog=False, ax=None, legend=True, linewidth=0.8):
-
-    x_plots = 1
-    if subplot_effect is not None:
-        col_effect_names = df[subplot_effect].value_counts().index
-        figsize = (figsize[0], figsize[1] * len(col_effect_names))
-        x_plots = len(col_effect_names)
-        sb.set_style('darkgrid')
-        fig, ax = plt.subplots(x_plots, 1, figsize=figsize)
-        for i, se in enumerate(col_effect_names):
-            sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df[df[subplot_effect] == se], ax=ax[i], legend=legend, linewidth=linewidth)
-            ax[i].text(*textpos, '{}={}'.format(subplot_effect, se), transform=ax[i].transAxes, fontsize=9)
-    else:
-        if ax is None:
-            fig, ax = plt.subplots(x_plots, 1, figsize=figsize)
-        sb.lineplot(x=x, y=y, hue=effect_1, style=effect_2, data=df, ax=ax, legend=legend, linewidth=linewidth)
-
-    if glob(basepath) == []:
-        mkdir(basepath)
-
-    if legend:
-        [a.legend(fontsize='x-small', ncols=2) for a in np.atleast_1d(ax)]
-
-    if semilog:
-       [a.semilogy() for a in plt.gcf().axes]
-    plt.savefig(join(basepath, '{}_{}_{}_{}_{}.pdf'.format(strftime("%Y-%m-%d_%H"), x, y, effect_1, effect_2, subplot_effect)))
+# ---------------------------------------------------------------------------------------------------------------------
+# ------------------------------------ Set tree models ----------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 
 
-max_iterations = 300
-par_steps = 11
-
-
-models = {'difft-c scenred': DiffTree(init='scenred', base_tree='scenred', loss='combined'),
-          'difft scenred': DiffTree(init='scenred', base_tree='scenred'),
-          'difft q-gen': DiffTree(init='quantiles', base_tree='quantiles'),
-          'ng scenred': NeuralGas(init='scenred', base_tree='scenred'),
-          'ng q-gen': NeuralGas(init='quantiles', base_tree='quantiles'),
+models = {'difft-c scenred': DiffTree(init_vals_method='scenred', init_tree_method='scenred', loss='combined'),
+          'difft scenred': DiffTree(init_vals_method='scenred', init_tree_method='scenred'),
+          'difft q-gen': DiffTree(init_vals_method='quantiles', init_tree_method='quantiles'),
+          'ng scenred': NeuralGas(init_vals_method='scenred', init_tree_method='scenred'),
+          'ng q-gen': NeuralGas(init_vals_method='quantiles', init_tree_method='quantiles'),
           'scenred': ScenredTree(),
           'q-gen': QuantileTree()}
 
@@ -77,27 +55,44 @@ processes = {'sin': sin_process,
              'random walk': random_walk}
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# ------------------------- Define fitiing and evaluating function ----------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------------------
 def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solutions=False, tol=1e-4):
     with semaphore:
-        results = []
+        # get number of steps and number of scenarios
         s, n = pars
+        results = []
         t_00 = time()
         solutions = {}
+
+        # number of nodes at each step
         nodes_at_step = np.linspace(2, s, s).astype(int)
+
+        # for all the tested processes
         for p_name, p in processes.items():
+            # define the process based on the number of steps and number of scenarios
             test_scens = p(steps=s, n_scens=n)
             test_scens_ex_post = p(steps=s, n_scens=500)
             sol = {}
+            # for all the tested models
             for m_name, m in models.items():
-                t_0 = time()
                 if do_plot:
                     print('{},{}: {}'.format(s, n, m_name))
-                #do_plot = True if m_name == 'dt scenred' and p_name == 'double sin' else False
+
+                # fit the tree
+                t_0 = time()
                 tree, _, _, _ = m.gen_tree(test_scens, k_max=max_iterations, do_plot=do_plot, tol=tol,
                                            nodes_at_step=nodes_at_step)
                 t_1 = time()
+
+                # evaluate the tree on scenarios
                 scen_dist, t_dist, reliability = m.evaluate_tree(test_scens)
+
+                # evaluate the tree on new scenarios not seen during training
                 scen_dist_ex_post, t_dist_ex_post, reliability_ex_post = m.evaluate_tree(test_scens_ex_post)
+
+                # put results together
                 results.append(pd.DataFrame({'model': str(m_name), 'process': str(p_name),
                                              'n_scens': np.copy(n), 'steps': np.copy(s), 'time': t_1 - t_0,
                                              'scen dist': float(scen_dist),
@@ -127,6 +122,7 @@ def parfun(pars, processes, models, max_iterations=200, do_plot=False, keep_solu
 if glob(savepath) == []:
     mkdir(savepath)
 
+# define the number of steps and number of scenarios to test
 scens_min, scens_max = 10, 210
 steps_min, steps_max = 10, 110
 par_steps = 11
@@ -139,13 +135,16 @@ print(stepsspace)
 parameters = {'n_scens': scensspace,
               'steps': stepsspace}
 pars = list(product(parameters['steps'], parameters['n_scens']))
-# find a separation of tested pars such that total numbers of nodes (times*scenarios) in each partition is ~same
+
+# find a separation of tested pars such that total numbers of nodes (times*scenarios) in each partition is ~same. This
+# is done to avoid flooding RAM with too many scenarios.
+
 n_tot = np.cumsum([t*n for t, n in pars])
 splits = np.quantile(n_tot, np.hstack([0, 2**(-np.linspace(1, 0, 6))]), method='nearest')
 cut_points = np.where(np.isin(n_tot, splits))[0]
 bins = [(a, cut_points[i+1]) for i, a in enumerate(cut_points[:-1])]
-print([np.sum([a[0]*a[1] for a in pars[b[0]:b[1]]]) for i, b in enumerate(bins)])
 
+# run the fitting and evaluation function in parallel or sequentially
 all_res = []
 for b in bins:
     bin_pars = pars[b[0]:b[1]]
@@ -161,7 +160,6 @@ for b in bins:
 
 results = pd.concat(all_res, axis=0)
 
-
 if glob(savepath) == []:
     mkdir(savepath)
 
@@ -170,6 +168,7 @@ results.to_pickle(join(savepath, 'results_{}.pk'.format(strftime("%Y-%m-%d_%H"))
 # -------------------------------------------------------------------------------------------------------------------- #
 # ----------------------------------------  plot   results ----------------------------------------------------------- #
 # -------------------------------------------------------------------------------------------------------------------- #
+
 get_nodes = lambda t: np.sum(np.linspace(2, t, t).astype(int)-1)
 results.rename({'n_scens': r'$S$', 'scen dist': r'$\tilde{d}(\xi^{sc}, \xi^{tr})$', 't dist': r'$d_d(\xi^{sc}, \xi^{tr})$', 'steps':r'$T$', 'time': 't [s]'}, axis=1, inplace=True)
 results.rename({'scen dist test': r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$', 't dist test': r'$d_d(\xi^{sc, te}, \xi^{tr})$'}, axis=1, inplace=True)
@@ -231,36 +230,20 @@ plt.savefig(join(savepath, 'results_combo_test_{}.pdf'.format(strftime("%Y-%m-%d
 
 plot_results(results, '$T$', 't [s]', 'model', figsize=(4.5, 2.5))
 
-def rankplot(df, key=r'$\tilde{d}(\xi^{sc}, \xi^{tr})$', ax=None):
-    rankmatrix = np.nan *np.zeros((len(df.model.unique()), len(df.model.unique())))
-    for i, m in enumerate(df.model.unique()):
-        for j, n in enumerate(df.model.unique()):
-            rankmatrix[i, j] = np.round(np.sum(df[df.model == m][key].values < df[df.model == n][key].values) / df[df.model == m][key].shape[0], 2)
-    print(df[df.model == m][key].shape[0])
-    sb.set_style('whitegrid')
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(4.5, 3))
-    sb.heatmap(rankmatrix, annot=True, ax=ax, cmap='Blues', cbar=False, fmt='g',xticklabels=
-               df.model.unique(), yticklabels=df.model.unique())
-    ax.set_xticklabels(df.model.unique(), rotation=45)
-    ax.set_yticklabels(df.model.unique(), rotation=0)
-    plt.subplots_adjust(bottom=0.25, left=0.25, wspace=0.3, hspace=0.3)
-    plt.savefig(join(savepath, '{}_{}_rankplot.pdf'.format(key, strftime("%Y-%m-%d_%H"))))
-
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
-rankplot(results, ax=ax[0])
-rankplot(results, key=r'$d_d(\xi^{sc}, \xi^{tr})$', ax=ax[1])
-rankplot(results, key=r'$\mathcal{R}$', ax=ax[2])
+rankplot(results, ax=ax[0], savepath=savepath)
+rankplot(results, key=r'$d_d(\xi^{sc}, \xi^{tr})$', ax=ax[1], savepath=savepath)
+rankplot(results, key=r'$\mathcal{R}$', ax=ax[2], savepath=savepath)
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 plt.savefig(join(savepath, 'rankplot_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
 
 
 fig, ax = plt.subplots(3, 1, figsize=(4.5, 4.5))
-rankplot(results, key=r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$',ax=ax[0])
-rankplot(results, key=r'$d_d(\xi^{sc, te}, \xi^{tr})$', ax=ax[1])
-rankplot(results, key=r'$\mathcal{R}_{te}$', ax=ax[2])
+rankplot(results, key=r'$\tilde{d}(\xi^{sc, te}, \xi^{tr})$',ax=ax[0], savepath=savepath)
+rankplot(results, key=r'$d_d(\xi^{sc, te}, \xi^{tr})$', ax=ax[1], savepath=savepath)
+rankplot(results, key=r'$\mathcal{R}_{te}$', ax=ax[2], savepath=savepath)
 plt.subplots_adjust(hspace=0.1, right=0.95, top=0.95)
 [a.set_xticklabels([]) for a in ax.ravel()[:-1]]
 plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H"))), bbox_inches='tight')
@@ -272,8 +255,8 @@ plt.savefig(join(savepath, 'rankplot_test_{}.pdf'.format(strftime("%Y-%m-%d_%H")
 
 models = {'q-gen': QuantileTree(),
           'scenred': ScenredTree(),
-          'ng scenred': NeuralGas(init='scenred', base_tree='scenred',savepath='results/figs/neuralgas/'),
-          'difft-c scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/'),
+          'ng scenred': NeuralGas(init_vals_method='scenred', init_tree_method='scenred',savepath='results/figs/neuralgas/'),
+          'difft-c scenred': DiffTree(init_vals_method='scenred', init_tree_method='scenred',savepath='results/figs/difftree/'),
           }
 
 _, solutions = parfun((25, 100), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=False)
@@ -306,7 +289,7 @@ ax[0, 3].set_title('difft scenred', size=8)
 plt.savefig(join(savepath, '{}_examples.pdf'.format(strftime("%Y-%m-%d_%H"))))
 
 
-models = {'dt scenred': DiffTree(init='scenred', base_tree='scenred',savepath='results/figs/difftree/')}
+models = {'dt scenred': DiffTree(init_vals_method='scenred', init_tree_method='scenred',savepath='results/figs/difftree/')}
 processes = {'double sin': partial(sin_process, double=True),}
 
 _, solutions = parfun((50, 200), processes, models, max_iterations=max_iterations, keep_solutions=True, do_plot=True, tol=1e-5)

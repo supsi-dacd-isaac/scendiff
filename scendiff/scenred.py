@@ -190,7 +190,7 @@ def scenred(samples_0, tol=10, metric='cityblock', nodes=None, logger=None):
 
 
 def get_network(S_s, P_s):
-    '''
+    """
     Get a network representation from the S_s and P_p matrices. The network is encoded in a networkx graph, each node
     has the following attribute:
     t: time of the node
@@ -202,7 +202,7 @@ def get_network(S_s, P_s):
     :param P_s: T*n_scen matrix, containing evolviong probabilities for each
                 scenario
     :return: g: a networkx graph with time, probability and values encoded with the connectivity of the nodes
-    '''
+    """
 
     assert np.sum(P_s[0, :] > 0) == 1, 'there is more than one node at root with P>0. Something wrong, ' \
                                        'most likely some observations at first step are equal down to epsilon'

@@ -3,6 +3,14 @@ import networkx as nx
 
 
 def retrieve_scenarios_indexes(g, dyn_offset=False):
+    """
+    Retrieve the indexes of the scenarios in the tree
+    :param g: a networkx graph (a tree)
+    :param dyn_offset: whether the control uses more than one observations for the first step to model initial variance
+    :return: scen_idxs_hist: a matrix of size (T, n_s) where T is the number of time steps and n_s the number of
+             scenarios
+             leaves: a vector of size n_s containing the indexes of the leaves
+    """
     n_n = len(g.nodes)
     node_set = np.linspace(0, n_n - 1, n_n, dtype=int)
     all_t = np.array(list(nx.get_node_attributes(g, 't').values()))
